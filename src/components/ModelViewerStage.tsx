@@ -56,11 +56,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     const hasAR = Boolean(item.hasAR && item.modelGlb);
     const hasInteractive3D = Boolean(hasAR && item.hasCustom3DScan);
     const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=10` : undefined;
-    // Omit missing static /models/*.usdz paths so @google/model-viewer auto-exports USDZ on iOS via prepareUSDZ()
-    const modelUsdzSrc =
-      item.modelUsdz && !item.modelUsdz.startsWith('/models/')
-        ? `${item.modelUsdz}?v=10`
-        : undefined;
+    const modelUsdzSrc = item.modelUsdz ? `${item.modelUsdz}?v=10` : undefined;
 
     useEffect(() => {
       setShowHotspotCard(false);

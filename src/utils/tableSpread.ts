@@ -119,6 +119,19 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
 }
 
 /**
+ * Builds the Vercel API path for a server-merged multi-dish GLB so Android Scene Viewer
+ * can load 2+ dishes over HTTPS (Scene Viewer rejects client-side blob: URLs).
+ */
+export function getSpreadApiGlbPath(items: CartItem[]): string {
+  const plates = expandCartToPlates(items);
+  const slugs = plates.map((plate) => {
+    const match = plate.url.match(/\/models\/([a-z0-9-]+)\.glb/i);
+    return match ? match[1].toLowerCase() : 'dal-tadka';
+  });
+  return `/api/spread.glb?models=${encodeURIComponent(slugs.join(','))}`;
+}
+
+/**
  * Builds a shareable URL encoding the current Table Tray items for Desktop -> Mobile QR handoff.
  */
 export function getSpreadDeepLinkUrl(items: CartItem[]): string {

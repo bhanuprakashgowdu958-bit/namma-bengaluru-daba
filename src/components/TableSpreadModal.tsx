@@ -23,6 +23,7 @@ import {
 import { formatINR, getDefaultVariant } from '../utils/format';
 import {
   buildTableSpreadModels,
+  getSpreadApiGlbPath,
   getSpreadDeepLinkUrl,
   type TableSpreadResult
 } from '../utils/tableSpread';
@@ -51,6 +52,8 @@ export function TableSpreadModal({
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
   const [arNotice, setArNotice] = useState<string | null>(null);
+  const [sceneViewerFailed, setSceneViewerFailed] = useState(false);
+  const [canUseWebXR, setCanUseWebXR] = useState(false);
 
   const totalDishes = items.reduce((sum, entry) => sum + entry.quantity, 0);
   const totalAmount = items.reduce(
@@ -113,6 +116,8 @@ export function TableSpreadModal({
     setIsBuilding(true);
     setBuildError(null);
     setArNotice(null);
+    setSceneViewerFailed(false);
+    setCanUseWebXR(false);
 
     buildTableSpreadModels(items)
       .then((res) => {
@@ -138,9 +143,40 @@ export function TableSpreadModal({
   }, [isOpen, items]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
+    const handleFallbackHash = () => {
+      if (
+        window.location.hash === '#ar-fallback' ||
+        window.location.hash === '#model-viewer-no-ar-fallback'
+      ) {
+        window.history.replaceState(
+          null,
+          '',
+          window.location.pathname + window.location.search
+        );
+        setSceneViewerFailed(true);
+        setArNotice(
+          'Google Scene Viewer could not launch on this device. Make sure Google App & Google Play Services for AR are installed and updated in Chrome.'
+        );
+      }
+    };
+
+    handleFallbackHash();
+    window.addEventListener('hashchange', handleFallbackHash);
+    return () => window.removeEventListener('hashchange', handleFallbackHash);
+  }, [isOpen]);
+
+  useEffect(() => {
     const el = viewerRef.current;
     if (!el || !spread) return;
+
+    const updateReadiness = () => {
+      setCanUseWebXR(Boolean(el.canActivateAR));
+    };
+
     const onArStatus = (event: Event) => {
+      updateReadiness();
       const customEvent = event as CustomEvent<{ status?: string }>;
       if (customEvent.detail?.status === 'failed') {
         setArNotice(
@@ -148,8 +184,12 @@ export function TableSpreadModal({
         );
       }
     };
+
+    updateReadiness();
+    el.addEventListener('load', updateReadiness);
     el.addEventListener('ar-status', onArStatus);
     return () => {
+      el.removeEventListener('load', updateReadiness);
       el.removeEventListener('ar-status', onArStatus);
     };
   }, [spread]);
@@ -162,6 +202,19 @@ export function TableSpreadModal({
       : totalDishes <= 3
         ? '1–2 guests'
         : `${Math.ceil(totalDishes / 1.5)} guests`;
+
+  const isAndroid = isAndroidDevice();
+  const androidSceneViewerUrl = useMemo(() => {
+    if (!isAndroid || items.length === 0) return null;
+    if (totalDishes === 1) {
+      const singlePath = items[0]?.item.modelGlb
+        ? `${items[0].item.modelGlb}?v=10`
+        : '/models/dal-tadka.glb?v=10';
+      return buildSceneViewerIntentUrl(singlePath, items[0].item.name);
+    }
+    const spreadTitle = `Table Spread (${totalDishes} Plates)`;
+    return buildSceneViewerIntentUrl(getSpreadApiGlbPath(items), spreadTitle);
+  }, [isAndroid, items, totalDishes]);
 
   const handleActivateAR = async () => {
     setArNotice(null);
@@ -178,46 +231,18 @@ export function TableSpreadModal({
       return;
     }
 
-    // Single dish on Android: launch native Scene Viewer directly on exact dish GLB
-    if (isAndroidDevice() && totalDishes === 1 && items[0]?.item.modelGlb) {
+    const el = viewerRef.current;
+    if (el && el.canActivateAR) {
       try {
-        const intentUrl = buildSceneViewerIntentUrl(
-          `${items[0].item.modelGlb}?v=10`,
-          items[0].item.name
-        );
-        const anchor = document.createElement('a');
-        anchor.setAttribute('href', intentUrl);
-        anchor.style.display = 'none';
-        document.body.appendChild(anchor);
-        anchor.click();
-        window.setTimeout(() => anchor.remove(), 100);
+        await el.activateAR();
         return;
       } catch {
-        // Fall through to WebXR
-      }
-    }
-
-    const el = viewerRef.current;
-    if (el && spread?.arGlbUrl) {
-      el.src = spread.arGlbUrl;
-      if (!el.canActivateAR) {
-        for (let attempt = 0; attempt < 6; attempt += 1) {
-          await new Promise((resolve) => window.setTimeout(resolve, 45));
-          if (el.canActivateAR) break;
-        }
-      }
-      if (el.canActivateAR) {
-        try {
-          await el.activateAR();
-          return;
-        } catch {
-          // Handled below
-        }
+        // Handled below
       }
     }
 
     setArNotice(
-      'Multi-dish table AR uses WebXR (Chrome on Android) or AR Quick Look (Safari on iPhone). You can also tap any single dish card for individual AR.'
+      'Table AR requires Safari on iPhone or Chrome with Google Play Services for AR on Android.'
     );
   };
 
@@ -335,6 +360,7 @@ export function TableSpreadModal({
                 src={spread.arGlbUrl}
                 ios-src={spread.usdzUrl}
                 alt="AR Table Spread Engine"
+                loading="eager"
                 ar
                 ar-modes="webxr quick-look"
                 ar-scale="fixed"
@@ -442,15 +468,40 @@ export function TableSpreadModal({
           </div>
 
           <div className="mt-4 flex flex-col gap-2.5 sm:flex-row lg:flex-col">
-            <button
-              type="button"
-              onClick={handleActivateAR}
-              disabled={!spread || isBuilding}
-              className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-            >
-              <Box className="h-[18px] w-[18px]" />
-              Place Full Spread on Table (AR)
-            </button>
+            {isAndroid && androidSceneViewerUrl ? (
+              <a
+                href={androidSceneViewerUrl}
+                onClick={() => {
+                  setArNotice(null);
+                  setSceneViewerFailed(false);
+                }}
+                className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <Box className="h-[18px] w-[18px]" />
+                Place Full Spread on Table (AR)
+              </a>
+            ) : (
+              <button
+                type="button"
+                onClick={handleActivateAR}
+                disabled={isMobileARCapableDevice() && (!spread || isBuilding)}
+                className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+              >
+                <Box className="h-[18px] w-[18px]" />
+                Place Full Spread on Table (AR)
+              </button>
+            )}
+
+            {isAndroid && sceneViewerFailed && canUseWebXR && (
+              <button
+                type="button"
+                onClick={handleActivateAR}
+                className="liquid-glass-pill flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/50 px-4 text-xs font-semibold text-[#F4A26E] transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <Box className="h-4 w-4" />
+                Try In-Browser WebXR AR
+              </button>
+            )}
 
             <button
               type="button"
