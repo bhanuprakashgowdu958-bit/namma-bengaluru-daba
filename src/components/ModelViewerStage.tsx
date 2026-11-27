@@ -175,8 +175,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
         // AR requires a real mobile device — desktop browsers cannot handle
         // Scene Viewer intent:// URLs or AR Quick Look even if model-viewer
         // reports canActivateAR (UA detection quirks, responsive mode, etc.)
-        const isMobile = isAndroidDevice() || isIOSDevice();
-        if (!isMobile) {
+        if (!isAndroidDevice() && !isIOSDevice()) {
           reveal3D();
           onARUnsupported?.(
             'AR requires a mobile phone. Scan the QR code on your phone, or drag above to inspect in 3D.'
@@ -184,33 +183,45 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           return false;
         }
 
-        // On real mobile: preserve synchronous user-gesture token when model-viewer AR is ready
-        if (el.canActivateAR) {
-          try {
-            await el.activateAR();
-            return true;
-          } catch {
-            // Fall through to Android intent or 3D inspection fallback
-          }
-        }
-
-        // Direct Scene Viewer launch for Android (bypasses async WebXR checks, desktop-mode flags,
-        // custom Chromium UAs, or recovery after a blocked Scene Viewer state)
+        // ── ANDROID: Always launch Scene Viewer directly ──
+        // Bypass model-viewer's el.activateAR() entirely on Android because:
+        // 1) $selectARMode() is async and may not have resolved (canActivateAR = false)
+        // 2) model-viewer's $openSceneViewer uses an internal $arAnchor that may
+        //    silently fail or expire the user-gesture token
+        // Scene Viewer downloads the GLB independently, so no local model load needed.
         if (isAndroidDevice()) {
           try {
             const intentUrl = buildSceneViewerIntentUrl(modelGlbSrc, item.name);
             const anchor = document.createElement('a');
             anchor.setAttribute('href', intentUrl);
+            anchor.style.display = 'none';
+            document.body.appendChild(anchor);
             anchor.click();
+            // Clean up after a tick
+            window.setTimeout(() => anchor.remove(), 100);
             return true;
           } catch {
-            // Fall through to 3D inspection fallback
+            reveal3D();
+            onARUnsupported?.(
+              'Could not launch AR. Make sure Google Play Services for AR is installed and updated.'
+            );
+            return false;
           }
         }
 
-        // iOS: wait briefly for async $selectARMode() resolution
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          await new Promise((resolve) => window.setTimeout(resolve, 45));
+        // ── iOS: Use model-viewer's activateAR for USDZ auto-generation ──
+        // Wait briefly for async $selectARMode() if Quick Look hasn't resolved yet
+        if (el.canActivateAR) {
+          try {
+            await el.activateAR();
+            return true;
+          } catch {
+            // Fall through
+          }
+        }
+
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 50));
           if (el.canActivateAR) {
             try {
               await el.activateAR();
@@ -222,13 +233,9 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
         }
 
         reveal3D();
-        const reason = isIOSDevice()
-          ? 'Open in Safari or Chrome on iOS for 1:1 AR Quick Look. Interactive 3D view is unlocked above.'
-          : isAndroidDevice()
-            ? 'AR requires Chrome & Google Play Services for AR. Interactive 3D view is unlocked above.'
-            : 'Open on Safari (iOS) or Chrome (Android) for 1:1 table AR, or drag above to inspect in 3D.';
-
-        onARUnsupported?.(reason);
+        onARUnsupported?.(
+          'AR Quick Look could not start. Try opening in Safari, or drag above to inspect in 3D.'
+        );
         return false;
       },
       reveal3D,

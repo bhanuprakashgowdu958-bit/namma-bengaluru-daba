@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Check, Minus, Plus, X } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
+import { buildSceneViewerIntentUrl, isAndroidDevice } from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import { DietaryBadge } from './DietaryBadge';
 import { ModelViewerStage, type ModelViewerStageHandle } from './ModelViewerStage';
@@ -192,16 +193,26 @@ export function DishARModal({
 
           {/* Dual Primary Action Bar (Thumb-Reachable) */}
           <div className="mt-5 space-y-2.5 pt-1">
-            {isAREnabled && (
-              <button
-                type="button"
-                onClick={handleViewOnTable}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
-              >
-                <Box className="h-[18px] w-[18px]" />
-                <span>View on Your Table (AR)</span>
-              </button>
-            )}
+            {isAREnabled &&
+              (isAndroidDevice() && item.modelGlb ? (
+                <a
+                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=5`, item.name)}
+                  onClick={() => setArHintMessage(null)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  <span>View on Your Table (AR)</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleViewOnTable}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  <span>View on Your Table (AR)</span>
+                </button>
+              ))}
 
             <div className="flex items-center gap-2.5">
               <div className="flex min-h-[48px] items-center rounded-2xl border border-white/10 bg-[#12100E] px-1.5 py-1">

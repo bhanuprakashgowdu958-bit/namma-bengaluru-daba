@@ -43,7 +43,7 @@ const TABLE_TONES: Record<
     label: 'Dark Slate',
     swatch: '#1E1A17',
     stageBg: 'radial-gradient(circle at 50% 48%, rgba(36,31,27,0.98) 0%, rgba(18,16,14,1) 85%)',
-    bambooTint: [1.0, 0.96, 0.92, 1]
+    bambooTint: [0.54, 0.45, 0.37, 1]
   },
   teak: {
     label: 'Warm Teak',
@@ -55,12 +55,12 @@ const TABLE_TONES: Record<
     label: 'Light Stone',
     swatch: '#B9B0A4',
     stageBg: 'radial-gradient(circle at 50% 52%, rgba(92,86,78,0.88) 0%, rgba(26,23,20,1) 88%)',
-    bambooTint: [1.14, 1.08, 1.0, 1]
+    bambooTint: [1.08, 1.02, 0.94, 1]
   }
 };
 
-const DESKTOP_SPREAD_ORBIT = '0deg 46deg 84%';
-const MOBILE_SPREAD_ORBIT = '0deg 50deg 108%';
+const DESKTOP_SPREAD_ORBIT = '0deg 38deg 84%';
+const MOBILE_SPREAD_ORBIT = '0deg 40deg 106%';
 
 export function TableSpreadModal({
   isOpen,

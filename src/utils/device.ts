@@ -34,8 +34,8 @@ export function buildSceneViewerIntentUrl(glbPath: string, title?: string): stri
   fallbackUrl.hash = 'ar-fallback';
 
   const params = new URLSearchParams({
-    file: originUrl.toString(),
     mode: 'ar_preferred',
+    disable_occlusion: 'true',
     resizable: 'false'
   });
   if (title) {
@@ -43,7 +43,7 @@ export function buildSceneViewerIntentUrl(glbPath: string, title?: string): stri
   }
 
   return (
-    `intent://arvr.google.com/scene-viewer/1.2?${params.toString()}` +
+    `intent://arvr.google.com/scene-viewer/1.2?${params.toString()}&file=${encodeURIComponent(originUrl.toString())}` +
     `#Intent;scheme=https;package=com.google.android.googlequicksearchbox;` +
     `action=android.intent.action.VIEW;` +
     `S.browser_fallback_url=${encodeURIComponent(fallbackUrl.toString())};end;`

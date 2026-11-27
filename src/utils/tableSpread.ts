@@ -37,7 +37,56 @@ function loadDishTemplate(url: string): Promise<THREE.Group> {
 
 interface PlateSpec {
   url: string;
+  poster?: string;
   label: string;
+}
+
+const posterTextureCache = new Map<string, Promise<THREE.Texture | null>>();
+
+function loadPosterPlateTexture(posterUrl: string): Promise<THREE.Texture | null> {
+  const cached = posterTextureCache.get(posterUrl);
+  if (cached) return cached;
+
+  const promise = new Promise<THREE.Texture | null>((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(null);
+          return;
+        }
+
+        // Crop into the center circular plate region of the studio poster so outer
+        // table slate margins don't appear as dark corners inside the 3D bowl rim
+        const cropFraction = 0.72;
+        const sw = img.naturalWidth * cropFraction;
+        const sh = img.naturalHeight * cropFraction;
+        const sx = (img.naturalWidth - sw) * 0.5;
+        const sy = (img.naturalHeight - sh) * 0.56;
+
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.flipY = false;
+        tex.needsUpdate = true;
+        resolve(tex);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = posterUrl;
+  });
+
+  posterTextureCache.set(posterUrl, promise);
+  return promise;
 }
 
 function expandCartToPlates(items: CartItem[]): PlateSpec[] {
@@ -51,7 +100,7 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
         ? `${entry.item.modelGlb}?v=5`
         : '/models/dal-tadka.glb?v=5';
       for (let i = 0; i < entry.quantity; i++) {
-        plates.push({ url, label: entry.item.name });
+        plates.push({ url, poster: entry.item.poster, label: entry.item.name });
       }
     }
     return plates;
@@ -62,7 +111,7 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
     const url = entry.item.modelGlb
       ? `${entry.item.modelGlb}?v=5`
       : '/models/dal-tadka.glb?v=5';
-    plates.push({ url, label: entry.item.name });
+    plates.push({ url, poster: entry.item.poster, label: entry.item.name });
   }
   return plates;
 }
@@ -93,12 +142,54 @@ export async function buildTableSpreadModels(
     throw new Error('Table tray is empty');
   }
 
-  const templates = await Promise.all(plates.map((p) => loadDishTemplate(p.url)));
+  const [templates, posterTextures] = await Promise.all([
+    Promise.all(plates.map((p) => loadDishTemplate(p.url))),
+    Promise.all(plates.map((p) => (p.poster ? loadPosterPlateTexture(p.poster) : Promise.resolve(null))))
+  ]);
   const root = new THREE.Group();
   root.name = 'NammaBengaluruTableSpread';
 
-  const prepared = templates.map((tpl) => {
+  const prepared = templates.map((tpl, idx) => {
     const clone = tpl.clone(true);
+    const posterTex = posterTextures[idx];
+
+    if (posterTex) {
+      clone.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return;
+        const mat = child.material as THREE.MeshStandardMaterial | undefined;
+        if (child.name === 'FoodMound' || mat?.name === 'FoodSurface') {
+          const geom = child.geometry.clone();
+          geom.computeBoundingBox();
+          const gBox = geom.boundingBox;
+          const pos = geom.attributes.position;
+          const uv = geom.attributes.uv;
+          if (pos && uv && gBox) {
+            const radius =
+              Math.max(
+                Math.abs(gBox.max.x),
+                Math.abs(gBox.min.x),
+                Math.abs(gBox.max.z),
+                Math.abs(gBox.min.z)
+              ) || 0.107;
+            for (let i = 0; i < pos.count; i++) {
+              const x = pos.getX(i);
+              const z = pos.getZ(i);
+              uv.setXY(i, (x / radius) * 0.5 + 0.5, (z / radius) * 0.5 + 0.5);
+            }
+            uv.needsUpdate = true;
+          }
+          child.geometry = geom;
+
+          if (mat) {
+            const nextMat = mat.clone();
+            nextMat.map = posterTex;
+            nextMat.needsUpdate = true;
+            child.material = nextMat;
+          }
+        }
+      });
+    }
+
     const box = new THREE.Box3().setFromObject(clone);
     const center = new THREE.Vector3();
     const size = new THREE.Vector3();
