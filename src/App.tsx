@@ -1,0 +1,385 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Box, Check, Minus, Plus, Ruler } from 'lucide-react';
+import { DesktopQRModal } from './components/DesktopQRModal';
+import { DietaryBadge } from './components/DietaryBadge';
+import { DishARModal } from './components/DishARModal';
+import type { CategoryFilter } from './components/HeaderFilters';
+import { MenuCatalog } from './components/MenuCatalog';
+import { ModelViewerStage } from './components/ModelViewerStage';
+import { TableSpreadModal } from './components/TableSpreadModal';
+import { TableTrayDrawer } from './components/TableTrayDrawer';
+import { MENU_ITEMS } from './data/menu';
+import type { CartItem, MenuItem, PriceVariant } from './types/menu';
+import { buildCartKey, formatINR, getDefaultVariant } from './utils/format';
+
+const DEFAULT_HERO_ITEM =
+  MENU_ITEMS.find((item) => item.hasAR) ?? MENU_ITEMS[0];
+
+export default function App() {
+  const [vegOnly, setVegOnly] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<CategoryFilter>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Mobile AR modal item vs Desktop split-screen sticky AR dish
+  const [mobileModalItem, setMobileModalItem] = useState<MenuItem | null>(null);
+  const [desktopActiveItem, setDesktopActiveItem] =
+    useState<MenuItem>(DEFAULT_HERO_ITEM);
+  const [desktopVariant, setDesktopVariant] = useState<PriceVariant>(() =>
+    getDefaultVariant(DEFAULT_HERO_ITEM)
+  );
+  const [desktopQty, setDesktopQty] = useState(1);
+  const [desktopJustAdded, setDesktopJustAdded] = useState(false);
+
+  // Desktop QR handoff modal (single dish or full spread)
+  const [qrModalItem, setQrModalItem] = useState<MenuItem | null>(null);
+  const [spreadQrPayload, setSpreadQrPayload] = useState<{
+    url: string;
+    title: string;
+    subtitle: string;
+  } | null>(null);
+
+  // Table Tray & Full Spread state
+  const [trayItems, setTrayItems] = useState<CartItem[]>([]);
+  const [isTrayOpen, setIsTrayOpen] = useState(false);
+  const [isSpreadOpen, setIsSpreadOpen] = useState(false);
+
+  // Deep-link ?dish=<id> and ?spread=<id:variant:qty,...> support for QR handoff
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    const spreadParam = params.get('spread');
+    if (spreadParam) {
+      const parsed: CartItem[] = [];
+      for (const token of spreadParam.split(',')) {
+        const [id, variantLabel, qtyStr] = token.split(':');
+        const matched = MENU_ITEMS.find((d) => d.id === id);
+        if (!matched) continue;
+        const variant =
+          matched.variants.find((v) => v.label === variantLabel) ??
+          getDefaultVariant(matched);
+        const qty = Math.max(1, Number.parseInt(qtyStr || '1', 10) || 1);
+        parsed.push({
+          cartKey: buildCartKey(matched.id, variant.label),
+          item: matched,
+          variant,
+          quantity: qty
+        });
+      }
+      if (parsed.length > 0) {
+        setTrayItems(parsed);
+        setIsSpreadOpen(true);
+        return;
+      }
+    }
+
+    const dishId = params.get('dish');
+    if (!dishId) return;
+
+    const matched = MENU_ITEMS.find((d) => d.id === dishId);
+    if (!matched) return;
+
+    if (matched.hasAR) {
+      setDesktopActiveItem(matched);
+      setDesktopVariant(getDefaultVariant(matched));
+    }
+
+    if (window.innerWidth < 1024) {
+      setMobileModalItem(matched);
+    }
+  }, []);
+
+  // Filtered menu items
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return MENU_ITEMS.filter((item) => {
+      if (vegOnly && item.diet !== 'veg') return false;
+      if (activeCategory !== 'All' && item.category !== activeCategory) return false;
+
+      if (query) {
+        const haystack =
+          `${item.name} ${item.category} ${item.description ?? ''}`.toLowerCase();
+        if (!haystack.includes(query)) return false;
+      }
+
+      return true;
+    });
+  }, [vegOnly, activeCategory, searchQuery]);
+
+  // Add item variant to Table Tray
+  const addToTray = (item: MenuItem, variant: PriceVariant, quantity = 1) => {
+    const cartKey = buildCartKey(item.id, variant.label);
+
+    setTrayItems((prev) => {
+      const existing = prev.find((entry) => entry.cartKey === cartKey);
+      if (existing) {
+        return prev.map((entry) =>
+          entry.cartKey === cartKey
+            ? { ...entry, quantity: entry.quantity + quantity }
+            : entry
+        );
+      }
+      return [
+        ...prev,
+        {
+          cartKey,
+          item,
+          variant,
+          quantity
+        }
+      ];
+    });
+  };
+
+  const handleDecrementVariant = (item: MenuItem, variant: PriceVariant) => {
+    const cartKey = buildCartKey(item.id, variant.label);
+    setTrayItems((prev) =>
+      prev
+        .map((entry) =>
+          entry.cartKey === cartKey
+            ? { ...entry, quantity: entry.quantity - 1 }
+            : entry
+        )
+        .filter((entry) => entry.quantity > 0)
+    );
+  };
+
+  const getVariantQuantity = (
+    itemId: string,
+    variantLabel: PriceVariant['label']
+  ): number => {
+    const cartKey = buildCartKey(itemId, variantLabel);
+    return trayItems.find((entry) => entry.cartKey === cartKey)?.quantity ?? 0;
+  };
+
+  const handleUpdateTrayQty = (cartKey: string, delta: number) => {
+    setTrayItems((prev) =>
+      prev
+        .map((entry) =>
+          entry.cartKey === cartKey
+            ? { ...entry, quantity: entry.quantity + delta }
+            : entry
+        )
+        .filter((entry) => entry.quantity > 0)
+    );
+  };
+
+  const handleInspectAR = (item: MenuItem) => {
+    if (item.hasAR) {
+      setDesktopActiveItem(item);
+      setDesktopVariant(getDefaultVariant(item));
+      setDesktopQty(1);
+      setDesktopJustAdded(false);
+    }
+
+    if (window.innerWidth < 1024) {
+      setMobileModalItem(item);
+    }
+  };
+
+  const handleDesktopAdd = () => {
+    addToTray(desktopActiveItem, desktopVariant, desktopQty);
+    setDesktopJustAdded(true);
+    window.setTimeout(() => setDesktopJustAdded(false), 1400);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#12100E] text-[#F7F3EC]">
+      {/* Responsive Shell: Mobile single column | Desktop >=1024px Editorial 55/45 Split-Screen */}
+      <div className="mx-auto flex max-w-[1600px] flex-col lg:flex-row">
+        {/* LEFT (55% on Desktop >=1024px): Sticky Full-Height 3D Dish Studio Stage (active hasAR dish) */}
+        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[55%] lg:flex-col lg:border-r lg:border-white/10 lg:bg-[#12100E]">
+          <div className="relative flex-1 overflow-hidden">
+            <ModelViewerStage
+              item={desktopActiveItem}
+              onARUnsupported={() => setQrModalItem(desktopActiveItem)}
+            />
+          </div>
+
+          <div className="border-t border-white/10 bg-[#1C1917]/90 px-8 py-6 backdrop-blur-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2.5">
+                  <DietaryBadge type={desktopActiveItem.diet} size="md" showLabel />
+                  <span className="text-xs text-[#A8A29E]">•</span>
+                  <span className="text-xs font-medium text-[#A8A29E]">
+                    {desktopActiveItem.category}
+                  </span>
+                  {desktopActiveItem.realWorldDimensions && (
+                    <>
+                      <span className="text-xs text-[#A8A29E]">•</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#A8A29E]">
+                        <Ruler className="h-3.5 w-3.5 text-[#D96B27]" />
+                        {desktopActiveItem.realWorldDimensions}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-[#F7F3EC]">
+                  {desktopActiveItem.name}
+                </h2>
+                {desktopActiveItem.description && (
+                  <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#A8A29E]">
+                    {desktopActiveItem.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="shrink-0 text-right">
+                <span className="text-2xl font-bold tabular-nums text-[#F7F3EC]">
+                  {formatINR(desktopVariant.price)}
+                </span>
+                <p className="mt-0.5 text-xs text-[#A8A29E]">
+                  {desktopVariant.label}
+                </p>
+              </div>
+            </div>
+
+            {desktopActiveItem.variants.length > 1 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-[#A8A29E]">Portion / Variant:</span>
+                {desktopActiveItem.variants.map((variant) => {
+                  const active = desktopVariant.label === variant.label;
+                  return (
+                    <button
+                      key={variant.label}
+                      type="button"
+                      onClick={() => setDesktopVariant(variant)}
+                      className={`min-h-[38px] rounded-full border px-3.5 text-xs font-medium transition ${
+                        active
+                          ? 'border-[#D96B27] bg-[#D96B27]/20 text-[#F7F3EC]'
+                          : 'border-white/10 bg-[#12100E]/70 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
+                      }`}
+                    >
+                      {variant.label} •{' '}
+                      <span className="tabular-nums text-[#F4A26E]">
+                        {formatINR(variant.price)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setQrModalItem(desktopActiveItem)}
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.99]"
+              >
+                <Box className="h-[18px] w-[18px]" />
+                View on Your Table (AR)
+              </button>
+
+              <div className="flex min-h-[48px] items-center rounded-2xl border border-white/10 bg-[#12100E] px-1.5 py-1">
+                <button
+                  type="button"
+                  onClick={() => setDesktopQty((q) => Math.max(1, q - 1))}
+                  aria-label="Decrease quantity"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[#A8A29E] hover:bg-white/5 hover:text-[#F7F3EC]"
+                >
+                  <Minus className="h-4 w-4" />
+                </button>
+                <span className="w-8 text-center text-sm font-semibold tabular-nums text-[#F7F3EC]">
+                  {desktopQty}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDesktopQty((q) => q + 1)}
+                  aria-label="Increase quantity"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[#A8A29E] hover:bg-white/5 hover:text-[#F7F3EC]"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleDesktopAdd}
+                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:bg-white/10 active:scale-[0.99]"
+              >
+                {desktopJustAdded ? (
+                  <>
+                    <Check className="h-4 w-4 text-[#22C55E]" />
+                    Added to Tray
+                  </>
+                ) : (
+                  <span className="tabular-nums">
+                    Add to Tray • {formatINR(desktopVariant.price * desktopQty)}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        {/* RIGHT (45% on Desktop, 100% on Mobile): Menu Catalog */}
+        <main className="mx-auto w-full max-w-lg lg:mx-0 lg:w-[45%] lg:max-w-none">
+          <MenuCatalog
+            items={filteredItems}
+            selectedItemId={desktopActiveItem.id}
+            vegOnly={vegOnly}
+            onToggleVegOnly={() => setVegOnly((v) => !v)}
+            activeCategory={activeCategory}
+            onSelectCategory={setActiveCategory}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onInspectAR={handleInspectAR}
+            onAddVariant={(item, variant) => addToTray(item, variant, 1)}
+            onDecrementVariant={handleDecrementVariant}
+            getVariantQuantity={getVariantQuantity}
+          />
+        </main>
+      </div>
+
+      {/* Mobile Full-Screen 3D & AR Studio Sheet */}
+      <DishARModal
+        item={mobileModalItem}
+        onClose={() => setMobileModalItem(null)}
+        onAddToTray={addToTray}
+      />
+
+      {/* Floating Table Tray Bar & Order Handoff Drawer */}
+      <TableTrayDrawer
+        items={trayItems}
+        isOpen={isTrayOpen}
+        onOpen={() => setIsTrayOpen(true)}
+        onClose={() => setIsTrayOpen(false)}
+        onUpdateQuantity={handleUpdateTrayQty}
+        onClearTray={() => setTrayItems([])}
+        onOpenTableSpread={() => {
+          setIsTrayOpen(false);
+          setIsSpreadOpen(true);
+        }}
+      />
+
+      {/* Full Cart Multi-Dish 3D & AR Table Spread Modal */}
+      <TableSpreadModal
+        isOpen={isSpreadOpen}
+        items={trayItems}
+        onClose={() => setIsSpreadOpen(false)}
+        onProceedToOrder={() => {
+          setIsSpreadOpen(false);
+          setIsTrayOpen(true);
+        }}
+        onUpdateQuantity={handleUpdateTrayQty}
+        onQuickAddPairing={(item, variant) => addToTray(item, variant, 1)}
+        onOpenSpreadQR={(url, title, subtitle) =>
+          setSpreadQrPayload({ url, title, subtitle })
+        }
+      />
+
+      {/* Desktop Smart AR QR Handoff Modal */}
+      <DesktopQRModal
+        item={qrModalItem}
+        customUrl={spreadQrPayload?.url}
+        customTitle={spreadQrPayload?.title}
+        customSubtitle={spreadQrPayload?.subtitle}
+        onClose={() => {
+          setQrModalItem(null);
+          setSpreadQrPayload(null);
+        }}
+      />
+    </div>
+  );
+}
