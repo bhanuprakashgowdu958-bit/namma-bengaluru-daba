@@ -22,34 +22,34 @@ const CATEGORY_BANNERS: Record<
   { poster: string; vegPoster?: string }
 > = {
   All: {
-    poster: '/posters/butter-chicken.jpg',
-    vegPoster: '/posters/aloo-paratha.jpg'
+    poster: '/categories/all.jpg',
+    vegPoster: '/categories/veg-main-course.jpg'
   },
   Breakfast: {
-    poster: '/posters/aloo-paratha.jpg'
+    poster: '/categories/breakfast.jpg'
   },
   'Other Delights': {
-    poster: '/posters/donne-biryani.jpg',
+    poster: '/categories/other-delights.jpg',
     vegPoster: '/posters/amritsari-kulcha.jpg'
   },
   Chinese: {
-    poster: '/posters/chilli-paneer.jpg'
+    poster: '/categories/chinese.jpg'
   },
   'Chinese Combos': {
-    poster: '/posters/chinese-combo.jpg'
+    poster: '/categories/chinese-combos.jpg'
   },
   'Kathi Rolls': {
-    poster: '/posters/chicken-cheese-roll.jpg',
+    poster: '/categories/kathi-rolls.jpg',
     vegPoster: '/posters/paneer-tikka-roll.jpg'
   },
   'Veg Main Course': {
-    poster: '/posters/kadai-paneer.jpg'
+    poster: '/categories/veg-main-course.jpg'
   },
   'Non-Veg Main Course': {
-    poster: '/posters/butter-chicken.jpg'
+    poster: '/categories/non-veg-main-course.jpg'
   },
   Breads: {
-    poster: '/posters/garlic-naan.jpg'
+    poster: '/categories/breads.jpg'
   }
 };
 
@@ -228,7 +228,7 @@ export function HeaderFilters({
               type="button"
               onClick={() => onSelectCategory(category)}
               aria-pressed={isActive}
-              className={`group relative flex h-[58px] min-w-[106px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border px-3 py-2 text-left transition active:scale-95 ${
+              className={`group relative flex h-[60px] min-w-[114px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border px-3 py-2 text-left transition active:scale-95 ${
                 isActive
                   ? 'border-[#D96B27] shadow-[0_0_0_1px_rgba(217,107,39,0.55),0_10px_24px_-8px_rgba(217,107,39,0.65)]'
                   : 'border-white/15 hover:border-white/30'
