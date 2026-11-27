@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Plus, Sparkles } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
 import { formatINR, getDefaultVariant } from '../utils/format';
@@ -21,7 +21,17 @@ interface MenuCatalogProps {
   getVariantQuantity: (itemId: string, variantLabel: PriceVariant['label']) => number;
 }
 
-const HERO_IDS = ['nv-3', 'bf-2', 'bf-29', 'od-1', 'bf-9'];
+const CATEGORY_HERO_IDS: Record<CategoryFilter, readonly string[]> = {
+  All: ['nv-3', 'bf-2', 'bf-29', 'od-1', 'bf-9'],
+  Breakfast: ['bf-2', 'bf-9', 'bf-11', 'bf-29', 'bf-15'],
+  'Other Delights': ['od-11', 'od-1', 'od-9', 'od-12', 'od-13'],
+  Chinese: ['ch-5', 'ch-20'],
+  'Chinese Combos': ['cc-1'],
+  'Kathi Rolls': ['kr-1', 'kr-6'],
+  'Veg Main Course': ['vm-14', 'vm-4', 'vm-1'],
+  'Non-Veg Main Course': ['nv-3', 'nv-1', 'nv-2', 'nv-12'],
+  Breads: ['br-1']
+};
 
 export function MenuCatalog({
   items,
@@ -39,17 +49,23 @@ export function MenuCatalog({
 }: MenuCatalogProps) {
   const [heroIdx, setHeroIdx] = useState(0);
 
+  useEffect(() => {
+    setHeroIdx(0);
+  }, [activeCategory, vegOnly]);
+
   const signatureHeroes = useMemo(() => {
-    const preferred = HERO_IDS.map((id) => items.find((entry) => entry.id === id)).filter(
-      (entry): entry is MenuItem => Boolean(entry && entry.poster && entry.hasAR)
-    );
+    const preferredIds = CATEGORY_HERO_IDS[activeCategory] ?? [];
+    const preferred = preferredIds
+      .map((id) => items.find((entry) => entry.id === id))
+      .filter(
+        (entry): entry is MenuItem => Boolean(entry && entry.poster && entry.hasAR)
+      );
     if (preferred.length > 0) return preferred;
-    return items.filter((entry) => entry.hasAR && entry.poster).slice(0, 4);
-  }, [items]);
+    return items.filter((entry) => entry.hasAR && entry.poster).slice(0, 5);
+  }, [items, activeCategory]);
 
   const activeHero = signatureHeroes[heroIdx % Math.max(1, signatureHeroes.length)];
-  const showHeroSpotlight =
-    activeCategory === 'All' && !searchQuery.trim() && Boolean(activeHero);
+  const showHeroSpotlight = !searchQuery.trim() && Boolean(activeHero);
 
   const groupedSections = useMemo(() => {
     if (activeCategory !== 'All' || searchQuery.trim()) {
@@ -143,7 +159,7 @@ export function MenuCatalog({
             </div>
 
             {/* Spotlight Dish Switcher Strip */}
-            {signatureHeroes.length > 1 && (
+            {signatureHeroes.length > 0 && (
               <div
                 onClick={(e) => e.stopPropagation()}
                 className="no-scrollbar flex items-center gap-1.5 overflow-x-auto border-t border-white/10 bg-[#14110F]/90 px-3 py-2.5 backdrop-blur-xl"
@@ -166,6 +182,11 @@ export function MenuCatalog({
                     </button>
                   );
                 })}
+                {signatureHeroes.length === 1 && (
+                  <span className="ml-auto shrink-0 pl-2 text-[10px] font-medium text-[#A8A29E]">
+                    Tap banner for 3D &amp; AR
+                  </span>
+                )}
               </div>
             )}
           </div>
