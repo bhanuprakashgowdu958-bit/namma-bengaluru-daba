@@ -1,8 +1,8 @@
-﻿import type { MenuCategory, MenuItem } from '../types/menu';
+import type { MenuCategory, MenuItem } from '../types/menu';
 
 export const RESTAURANT_CONFIG = {
   brandName: 'NAMMA BENGALURU DABA',
-  currency: 'â‚¹',
+  currency: '₹',
   whatsappNumber: '1234567890' // Replace with your restaurant WhatsApp number
 };
 
@@ -376,7 +376,7 @@ export const MENU_ITEMS: MenuItem[] = [
     modelGlb: '/models/pasta-red-sauce.glb',
     poster: '/posters/pasta-red-sauce.jpg',
     realWorldDimensions: '22 cm pasta bowl',
-    description: 'Glossy red arrabbiata sauce penne tossed with sautÃ©ed bell peppers, basil, garlic, and parmesan curls.',
+    description: 'Glossy red arrabbiata sauce penne tossed with sautéed bell peppers, basil, garlic, and parmesan curls.',
     variants: [{ label: 'Regular', price: 80 }]
   },
   {
