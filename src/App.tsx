@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Check, Minus, Plus, Ruler } from 'lucide-react';
+import { Box, Check, ChevronLeft, ChevronRight, Minus, Plus, Ruler, Sparkles } from 'lucide-react';
 import { DesktopQRModal } from './components/DesktopQRModal';
 import { DietaryBadge } from './components/DietaryBadge';
 import { DishARModal } from './components/DishARModal';
@@ -182,26 +182,80 @@ export default function App() {
     window.setTimeout(() => setDesktopJustAdded(false), 1400);
   };
 
+  const featuredArItems = useMemo(
+    () => MENU_ITEMS.filter((entry) => entry.hasAR && entry.poster),
+    []
+  );
+
+  const cycleDesktopDish = (direction: -1 | 1) => {
+    if (featuredArItems.length === 0) return;
+    const currentIndex = featuredArItems.findIndex((d) => d.id === desktopActiveItem.id);
+    const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+    const nextIndex = (baseIndex + direction + featuredArItems.length) % featuredArItems.length;
+    const next = featuredArItems[nextIndex];
+    setDesktopActiveItem(next);
+    setDesktopVariant(getDefaultVariant(next));
+    setDesktopQty(1);
+    setDesktopJustAdded(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#12100E] text-[#F7F3EC]">
+    <div className="relative min-h-screen bg-[#070709] text-[#F7F3EC]">
+      {/* Pure OLED Obsidian + Warm Amber Spatial Refraction Glows */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+      >
+        <div className="absolute -right-24 -top-24 h-[28rem] w-[28rem] rounded-full bg-[#D96B27]/16 blur-[130px]" />
+        <div className="absolute left-[-10%] top-[34%] h-[30rem] w-[30rem] rounded-full bg-[#F59E0B]/10 blur-[145px]" />
+        <div className="absolute -bottom-28 right-[18%] h-[26rem] w-[26rem] rounded-full bg-[#D96B27]/12 blur-[130px]" />
+        <div className="noise-grain absolute inset-0 opacity-[0.035]" />
+      </div>
+
       {/* Responsive Shell: Mobile single column | Desktop >=1024px Editorial 55/45 Split-Screen */}
-      <div className="mx-auto flex max-w-[1600px] flex-col lg:flex-row">
-        {/* LEFT (55% on Desktop >=1024px): Sticky Full-Height 3D Dish Studio Stage (active hasAR dish) */}
-        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[55%] lg:flex-col lg:border-r lg:border-white/10 lg:bg-[#12100E]">
-          <div className="relative flex-1 overflow-hidden">
+      <div className="relative z-10 mx-auto flex max-w-[1600px] flex-col lg:flex-row">
+        {/* LEFT (55% on Desktop >=1024px): Sticky Architectural 3D & AR Gallery Studio */}
+        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[55%] lg:flex-col lg:justify-between lg:border-r lg:border-white/10 lg:bg-transparent lg:p-6">
+          {/* Detached Top Gallery Frame + Floating Dish Switcher */}
+          <div className="relative flex flex-1 flex-col overflow-hidden rounded-[32px] border border-white/15 bg-[#0A0A0D] shadow-[0_32px_80px_-16px_rgba(0,0,0,0.92)]">
             <ModelViewerStage
               item={desktopActiveItem}
               onARUnsupported={() => setQrModalItem(desktopActiveItem)}
             />
+
+            {/* Top-Right Quick Dish Carousel Switcher */}
+            <div className="absolute right-4 top-4 z-20 flex items-center gap-1.5">
+              <span className="liquid-glass-pill hidden items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-medium text-[#F7F3EC]/85 xl:inline-flex">
+                <Sparkles className="h-3 w-3 text-[#D96B27]" />
+                Chef&apos;s Studio
+              </span>
+              <button
+                type="button"
+                onClick={() => cycleDesktopDish(-1)}
+                aria-label="Previous dish"
+                className="liquid-glass-pill flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-[#F7F3EC] transition hover:border-white/30 active:scale-90"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => cycleDesktopDish(1)}
+                aria-label="Next dish"
+                className="liquid-glass-pill flex h-10 w-10 items-center justify-center rounded-full border border-white/15 text-[#F7F3EC] transition hover:border-white/30 active:scale-90"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="border-t border-white/10 bg-[#1C1917]/90 px-8 py-6 backdrop-blur-2xl">
+          {/* Floating Liquid Glass Spec & Order Deck */}
+          <div className="liquid-glass mt-4 rounded-[28px] border border-white/15 px-7 py-5">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
                   <DietaryBadge type={desktopActiveItem.diet} size="md" showLabel />
                   <span className="text-xs text-[#A8A29E]">•</span>
-                  <span className="text-xs font-medium text-[#A8A29E]">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#A8A29E]">
                     {desktopActiveItem.category}
                   </span>
                   {desktopActiveItem.realWorldDimensions && (
@@ -215,11 +269,11 @@ export default function App() {
                   )}
                 </div>
 
-                <h2 className="mt-2 font-serif text-3xl font-semibold tracking-tight text-[#F7F3EC]">
+                <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#F7F3EC] xl:text-3xl">
                   {desktopActiveItem.name}
                 </h2>
                 {desktopActiveItem.description && (
-                  <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-[#A8A29E]">
+                  <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[#A8A29E] xl:text-sm">
                     {desktopActiveItem.description}
                   </p>
                 )}
@@ -236,7 +290,7 @@ export default function App() {
             </div>
 
             {desktopActiveItem.variants.length > 1 && (
-              <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="mt-3.5 flex flex-wrap items-center gap-2">
                 <span className="text-xs font-medium text-[#A8A29E]">Portion / Variant:</span>
                 {desktopActiveItem.variants.map((variant) => {
                   const active = desktopVariant.label === variant.label;
@@ -248,7 +302,7 @@ export default function App() {
                       className={`min-h-[38px] rounded-full border px-3.5 text-xs font-medium transition ${
                         active
                           ? 'border-[#D96B27] bg-[#D96B27]/20 text-[#F7F3EC]'
-                          : 'border-white/10 bg-[#12100E]/70 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
+                          : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
                       }`}
                     >
                       {variant.label} •{' '}
@@ -261,17 +315,17 @@ export default function App() {
               </div>
             )}
 
-            <div className="mt-5 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setQrModalItem(desktopActiveItem)}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.99]"
+                className="liquid-glass-saffron inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-5 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.99]"
               >
                 <Box className="h-[18px] w-[18px]" />
                 View on Your Table (AR)
               </button>
 
-              <div className="flex min-h-[48px] items-center rounded-2xl border border-white/10 bg-[#12100E] px-1.5 py-1">
+              <div className="liquid-glass-pill flex min-h-[48px] items-center rounded-2xl border border-white/15 px-1.5 py-1">
                 <button
                   type="button"
                   onClick={() => setDesktopQty((q) => Math.max(1, q - 1))}
@@ -296,7 +350,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleDesktopAdd}
-                className="inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-5 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:bg-white/10 active:scale-[0.99]"
+                className="liquid-glass-pill inline-flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 px-5 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110 active:scale-[0.99]"
               >
                 {desktopJustAdded ? (
                   <>

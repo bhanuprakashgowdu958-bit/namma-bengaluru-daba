@@ -77,13 +77,13 @@ export function DesktopQRModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 12 }}
           transition={{ type: 'spring', stiffness: 360, damping: 30 }}
-          className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#1C1917]/95 p-7 text-center backdrop-blur-2xl shadow-glass"
+          className="liquid-glass relative z-10 w-full max-w-md rounded-3xl border border-white/20 p-7 text-center"
         >
           <button
             type="button"
             onClick={onClose}
             aria-label="Close QR handoff modal"
-            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#A8A29E] transition hover:text-[#F7F3EC]"
+            className="liquid-glass-pill absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 text-[#A8A29E] transition hover:text-[#F7F3EC]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -119,7 +119,7 @@ export function DesktopQRModal({
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-4 text-xs font-medium text-[#F7F3EC] transition hover:border-white/20 hover:bg-white/10"
+              className="liquid-glass-pill inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/15 px-4 text-xs font-medium text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110"
             >
               {copied ? (
                 <>

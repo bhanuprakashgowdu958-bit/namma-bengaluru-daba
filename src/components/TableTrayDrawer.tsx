@@ -81,10 +81,10 @@ export function TableTrayDrawer({
             <button
               type="button"
               onClick={onOpen}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 bg-[#1C1917]/90 px-4 py-3.5 text-left backdrop-blur-xl shadow-glass transition hover:border-[#D96B27]/60 active:scale-[0.99]"
+              className="liquid-glass flex w-full items-center justify-between gap-3 rounded-2xl border border-white/20 px-4 py-3.5 text-left transition hover:border-[#D96B27]/70 active:scale-[0.99]"
             >
               <div className="flex items-center gap-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#D96B27] text-[#F7F3EC] shadow-saffron">
+                <span className="liquid-glass-saffron flex h-9 w-9 items-center justify-center rounded-xl border border-white/25 text-[#F7F3EC]">
                   <ShoppingBag className="h-4 w-4" />
                 </span>
                 <div>
@@ -124,7 +124,7 @@ export function TableTrayDrawer({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-              className="relative z-10 flex max-h-[90dvh] w-full flex-col rounded-t-3xl border-t border-white/10 bg-[#1C1917] shadow-glass lg:h-full lg:max-h-none lg:w-[440px] lg:rounded-none lg:border-l lg:border-t-0"
+              className="liquid-glass-sheet relative z-10 flex max-h-[90dvh] w-full flex-col rounded-t-3xl border-t border-white/15 lg:h-full lg:max-h-none lg:w-[440px] lg:rounded-none lg:border-l lg:border-t-0"
               role="dialog"
               aria-modal="true"
               aria-label="Table Tray"
@@ -278,7 +278,7 @@ export function TableTrayDrawer({
                             return (
                               <div
                                 key={entry.cartKey}
-                                className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#12100E]/70 p-3"
+                                className="liquid-glass-card flex items-center justify-between gap-3 rounded-2xl border border-white/12 p-3"
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   {entry.item.poster ? (
@@ -390,7 +390,7 @@ export function TableTrayDrawer({
                         <button
                           type="button"
                           onClick={onOpenTableSpread}
-                          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/60 bg-[#D96B27]/15 px-4 py-3 text-sm font-semibold text-[#F7F3EC] transition hover:bg-[#D96B27]/25 active:scale-[0.98]"
+                          className="liquid-glass-pill flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/60 bg-[#D96B27]/15 px-4 py-3 text-sm font-semibold text-[#F7F3EC] transition hover:bg-[#D96B27]/25 active:scale-[0.98]"
                         >
                           <Box className="h-[18px] w-[18px] text-[#D96B27]" />
                           View Full Spread on Table (3D / AR)
@@ -399,7 +399,7 @@ export function TableTrayDrawer({
                         <button
                           type="button"
                           onClick={handleSendWhatsApp}
-                          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
+                          className="liquid-glass-saffron flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
                         >
                           <MessageCircle className="h-[18px] w-[18px]" />
                           Send Order via WhatsApp
@@ -408,7 +408,7 @@ export function TableTrayDrawer({
                         <button
                           type="button"
                           onClick={() => setServerTicketMode(true)}
-                          className="flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:bg-white/10 active:scale-[0.98]"
+                          className="liquid-glass-pill flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 py-3 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110 active:scale-[0.98]"
                         >
                           <ClipboardList className="h-[18px] w-[18px] text-[#F4A26E]" />
                           Show Order to Server

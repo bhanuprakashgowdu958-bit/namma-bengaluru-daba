@@ -38,25 +38,29 @@ export function MenuCard({
       onClick={() => {
         if (isAR) onInspectAR(item);
       }}
-      className={`group relative flex items-center gap-3.5 rounded-2xl border p-3.5 backdrop-blur-xl transition ${
+      className={`liquid-glass-card group relative flex items-center gap-3.5 rounded-[22px] border p-3.5 transition-all duration-300 ${
         isAR ? 'cursor-pointer' : ''
       } ${
         isSelectedOnDesktop
-          ? 'border-[#D96B27]/85 bg-[#1C1917] shadow-[0_0_0_1px_rgba(217,107,39,0.28)]'
-          : 'border-white/10 bg-[#1C1917]/80 hover:border-white/20 hover:bg-[#1C1917]'
+          ? 'border-[#D96B27]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_0_1px_rgba(217,107,39,0.35),0_18px_40px_-10px_rgba(217,107,39,0.28)]'
+          : 'border-white/12 hover:border-white/25'
       }`}
     >
-      {/* Fast-loading 2D studio poster thumbnail for AR Hero items */}
+      {/* Framed Studio Portrait for AR Hero Dishes */}
       {hasStudioPhoto && (
-        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#241F1B]">
+        <div className="relative h-[104px] w-[104px] shrink-0 overflow-hidden rounded-2xl border border-white/20 bg-[#1B1714] shadow-[0_8px_20px_-6px_rgba(0,0,0,0.7)] ring-1 ring-inset ring-white/10">
           <img
             src={item.poster}
             alt={item.name}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-105"
           />
-          <span className="absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-white/15 bg-[#12100E]/88 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F7F3EC] backdrop-blur-md">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-white/5"
+          />
+          <span className="liquid-glass-pill absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F7F3EC]">
             <Box className="h-2.5 w-2.5 text-[#D96B27]" />
             3D / AR
           </span>
@@ -69,7 +73,7 @@ export function MenuCard({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <DietaryBadge type={item.diet} />
-              <span className="truncate text-[11px] font-medium text-[#A8A29E]">
+              <span className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[#A8A29E]">
                 {item.category}
               </span>
             </div>
@@ -82,12 +86,12 @@ export function MenuCard({
             )}
           </div>
 
-          <h2 className="mt-1 font-serif text-[16px] font-semibold leading-snug tracking-tight text-[#F7F3EC]">
+          <h2 className="mt-1 font-serif text-[16.5px] font-semibold leading-snug tracking-tight text-[#F7F3EC]">
             {item.name}
           </h2>
 
           {item.description && (
-            <p className="mt-0.5 line-clamp-1 text-xs text-[#A8A29E]">
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-[#A8A29E]">
               {item.description}
             </p>
           )}
@@ -139,7 +143,7 @@ export function MenuCard({
               <button
                 type="button"
                 onClick={() => onInspectAR(item)}
-                className="inline-flex min-h-[44px] items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-[#F7F3EC] transition hover:border-[#D96B27]/60 hover:bg-[#D96B27]/15 active:scale-95"
+                className="liquid-glass-pill inline-flex min-h-[44px] items-center gap-1 rounded-full border border-white/15 px-3 text-xs font-medium text-[#F7F3EC] transition hover:border-[#D96B27]/65 active:scale-95"
               >
                 <Box className="h-3.5 w-3.5 text-[#D96B27]" />
                 <span>3D</span>
@@ -150,13 +154,13 @@ export function MenuCard({
               <button
                 type="button"
                 onClick={() => onAddVariant(item, selectedVariant)}
-                className="inline-flex min-h-[44px] min-w-[76px] items-center justify-center gap-1 rounded-full border border-[#D96B27]/70 bg-[#D96B27]/15 px-3.5 text-xs font-semibold text-[#F7F3EC] transition hover:bg-[#D96B27] active:scale-95"
+                className="liquid-glass-pill inline-flex min-h-[44px] min-w-[76px] items-center justify-center gap-1 rounded-full border border-[#D96B27]/75 bg-[#D96B27]/20 px-3.5 text-xs font-semibold text-[#F7F3EC] transition hover:bg-[#D96B27] active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add
               </button>
             ) : (
-              <div className="inline-flex min-h-[44px] items-center gap-1 rounded-full border border-[#D96B27] bg-[#D96B27] px-1.5 text-xs font-semibold text-[#F7F3EC]">
+              <div className="liquid-glass-saffron inline-flex min-h-[44px] items-center gap-1 rounded-full border border-white/25 px-1.5 text-xs font-semibold text-[#F7F3EC]">
                 <button
                   type="button"
                   onClick={() => onDecrementVariant(item, selectedVariant)}

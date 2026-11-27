@@ -5,7 +5,10 @@ import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 import type { CartItem } from '../types/menu';
 
 export interface TableSpreadResult {
+  /** 3D White Bistro Table + dishes for screen preview */
   glbUrl: string;
+  /** Dishes only (no table slab) for placing onto the customer's real physical table in AR */
+  arGlbUrl: string;
   usdzUrl?: string;
   plateCount: number;
   estimatedWidthCm: number;
@@ -62,12 +65,12 @@ function loadPosterPlateTexture(posterUrl: string): Promise<THREE.Texture | null
           return;
         }
 
-        // Crop into the center plate region of the studio poster cleanly without outer table margins
+        // Crisp inner-plate crop so food fills the sculpted artisan stoneware plate cleanly against a white table
         const cropFraction = 0.78;
         const sw = img.naturalWidth * cropFraction;
         const sh = img.naturalHeight * cropFraction;
         const sx = (img.naturalWidth - sw) * 0.5;
-        const sy = (img.naturalHeight - sh) * 0.55;
+        const sy = (img.naturalHeight - sh) * 0.54;
 
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
 
@@ -96,8 +99,8 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
   if (totalQty <= MAX_PLATES) {
     for (const entry of items) {
       const url = entry.item.modelGlb
-        ? `${entry.item.modelGlb}?v=6`
-        : '/models/dal-tadka.glb?v=6';
+        ? `${entry.item.modelGlb}?v=10`
+        : '/models/dal-tadka.glb?v=10';
       for (let i = 0; i < entry.quantity; i++) {
         plates.push({ url, poster: entry.item.poster, label: entry.item.name });
       }
@@ -108,8 +111,8 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
   for (const entry of items) {
     if (plates.length >= MAX_PLATES) break;
     const url = entry.item.modelGlb
-      ? `${entry.item.modelGlb}?v=6`
-      : '/models/dal-tadka.glb?v=6';
+      ? `${entry.item.modelGlb}?v=10`
+      : '/models/dal-tadka.glb?v=10';
     plates.push({ url, poster: entry.item.poster, label: entry.item.name });
   }
   return plates;
@@ -129,9 +132,55 @@ export function getSpreadDeepLinkUrl(items: CartItem[]): string {
   return url.toString();
 }
 
+function createWhiteMarbleTableTexture(): THREE.CanvasTexture {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const radial = ctx.createRadialGradient(
+      size * 0.48,
+      size * 0.45,
+      size * 0.05,
+      size * 0.5,
+      size * 0.5,
+      size * 0.52
+    );
+    radial.addColorStop(0, '#FFFFFF');
+    radial.addColorStop(0.65, '#F6F4EF');
+    radial.addColorStop(1, '#ECE7DF');
+    ctx.fillStyle = radial;
+    ctx.fillRect(0, 0, size, size);
+
+    // Subtle fine marble mineral veins
+    ctx.strokeStyle = 'rgba(176, 168, 158, 0.14)';
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 8; i++) {
+      ctx.beginPath();
+      let x = (i * 73) % size;
+      let y = 0;
+      ctx.moveTo(x, y);
+      for (let step = 0; step < 8; step++) {
+        x += Math.sin(step * 1.3 + i) * 36;
+        y += size / 8;
+        ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /**
  * Loads all dishes in the customer's Table Tray, arranges them snugly at true 1:1
- * relative physical scale, and exports a combined GLB (+ USDZ for iOS).
+ * relative physical scale, and exports:
+ * - `glbUrl`: dishes resting cleanly on a bright 3D White Restaurant Table for screen preview
+ * - `arGlbUrl` + `usdzUrl`: dishes alone (without white table) for native tabletop AR
  */
 export async function buildTableSpreadModels(
   items: CartItem[]
@@ -227,15 +276,19 @@ export async function buildTableSpreadModels(
 
   const totalBox = new THREE.Box3().setFromObject(root);
   const totalSize = new THREE.Vector3();
+  const totalCenter = new THREE.Vector3();
   totalBox.getSize(totalSize);
+  totalBox.getCenter(totalCenter);
   const estimatedWidthCm = Math.round(totalSize.x * 100);
 
   const gltfExporter = new GLTFExporter();
-  const glbBuffer = (await gltfExporter.parseAsync(root, {
+
+  // Export clean AR model (plates only, no white table) first
+  const arGlbBuffer = (await gltfExporter.parseAsync(root, {
     binary: true
   })) as ArrayBuffer;
-  const glbBlob = new Blob([glbBuffer], { type: 'model/gltf-binary' });
-  const glbUrl = URL.createObjectURL(glbBlob);
+  const arGlbBlob = new Blob([arGlbBuffer], { type: 'model/gltf-binary' });
+  const arGlbUrl = URL.createObjectURL(arGlbBlob);
 
   let usdzUrl: string | undefined;
   try {
@@ -249,13 +302,57 @@ export async function buildTableSpreadModels(
     usdzUrl = undefined;
   }
 
+  // Now wrap the scene onto a bright 3D White Marble Bistro Table for screen preview
+  const previewRoot = new THREE.Group();
+  previewRoot.name = 'NammaBengaluruWhiteTablePreview';
+  previewRoot.add(root);
+
+  const spreadSpan = Math.max(totalSize.x, totalSize.z);
+  const tableRadius = Math.max(0.27, spreadSpan * 0.5 + 0.14);
+  const tableThickness = 0.022;
+
+  const tableTopGeo = new THREE.CylinderGeometry(tableRadius, tableRadius * 0.985, tableThickness, 72);
+  const marbleTex = createWhiteMarbleTableTexture();
+  const tableMat = new THREE.MeshStandardMaterial({
+    name: 'WhiteBistroTable',
+    map: marbleTex,
+    color: 0xffffff,
+    roughness: 0.42,
+    metalness: 0.02
+  });
+  const tableMesh = new THREE.Mesh(tableTopGeo, tableMat);
+  tableMesh.position.set(totalCenter.x, -tableThickness * 0.5 - 0.0005, totalCenter.z);
+  tableMesh.name = 'WhiteDiningTable';
+  previewRoot.add(tableMesh);
+
+  // Subtle warm champagne-steel table edge trim
+  const trimGeo = new THREE.TorusGeometry(tableRadius * 0.998, 0.0022, 10, 72);
+  trimGeo.rotateX(Math.PI / 2);
+  const trimMat = new THREE.MeshStandardMaterial({
+    name: 'WhiteTableTrim',
+    color: 0xd8d2c9,
+    roughness: 0.35,
+    metalness: 0.25
+  });
+  const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+  trimMesh.position.set(totalCenter.x, -0.001, totalCenter.z);
+  previewRoot.add(trimMesh);
+
+  const previewGlbBuffer = (await gltfExporter.parseAsync(previewRoot, {
+    binary: true
+  })) as ArrayBuffer;
+  const previewGlbBlob = new Blob([previewGlbBuffer], { type: 'model/gltf-binary' });
+  const glbUrl = URL.createObjectURL(previewGlbBlob);
+
   const cleanup = () => {
     URL.revokeObjectURL(glbUrl);
+    URL.revokeObjectURL(arGlbUrl);
     if (usdzUrl) URL.revokeObjectURL(usdzUrl);
   };
 
   return {
     glbUrl,
+    arGlbUrl,
     usdzUrl,
     plateCount: count,
     estimatedWidthCm,

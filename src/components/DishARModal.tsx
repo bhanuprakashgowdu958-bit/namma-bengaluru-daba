@@ -76,7 +76,7 @@ export function DishARModal({
         exit={{ opacity: 0, y: '100%' }}
         transition={{ type: 'spring', stiffness: 360, damping: 36 }}
         className={`fixed inset-0 z-50 flex flex-col lg:hidden ${
-          isAREnabled ? 'bg-[#12100E]' : 'justify-end bg-black/70 backdrop-blur-sm'
+          isAREnabled ? 'bg-[#070709]' : 'justify-end bg-black/75 backdrop-blur-md'
         }`}
         role="dialog"
         aria-modal="true"
@@ -102,7 +102,7 @@ export function DishARModal({
               type="button"
               onClick={onClose}
               aria-label="Close 3D Dish Studio"
-              className="absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1C1917]/85 text-[#F7F3EC] backdrop-blur-xl transition hover:bg-[#1C1917] active:scale-90"
+              className="liquid-glass-pill absolute right-4 top-4 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-[#F7F3EC] transition hover:brightness-110 active:scale-90"
             >
               <X className="h-5 w-5" />
             </button>
@@ -112,7 +112,7 @@ export function DishARModal({
         {/* Bottom Thumb-Zone Sheet */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`relative z-20 flex flex-col justify-between overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#1C1917]/95 px-5 pb-6 pt-5 backdrop-blur-2xl ${
+          className={`liquid-glass-sheet relative z-20 flex flex-col justify-between overflow-y-auto rounded-t-3xl border-t border-white/15 px-5 pb-6 pt-5 ${
             isAREnabled ? 'flex-1' : 'max-h-[75dvh]'
           }`}
         >
@@ -196,9 +196,9 @@ export function DishARModal({
             {isAREnabled &&
               (isAndroidDevice() && item.modelGlb ? (
                 <a
-                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=6`, item.name)}
+                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=10`, item.name)}
                   onClick={() => setArHintMessage(null)}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
+                  className="liquid-glass-saffron flex w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
                 >
                   <Box className="h-[18px] w-[18px]" />
                   <span>View on Your Table (AR)</span>
@@ -207,7 +207,7 @@ export function DishARModal({
                 <button
                   type="button"
                   onClick={handleViewOnTable}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
+                  className="liquid-glass-saffron flex w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
                 >
                   <Box className="h-[18px] w-[18px]" />
                   <span>View on Your Table (AR)</span>
@@ -215,7 +215,7 @@ export function DishARModal({
               ))}
 
             <div className="flex items-center gap-2.5">
-              <div className="flex min-h-[48px] items-center rounded-2xl border border-white/10 bg-[#12100E] px-1.5 py-1">
+              <div className="liquid-glass-pill flex min-h-[48px] items-center rounded-2xl border border-white/15 px-1.5 py-1">
                 <button
                   type="button"
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -242,8 +242,8 @@ export function DishARModal({
                 onClick={handleAdd}
                 className={`flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-[#F7F3EC] transition active:scale-[0.98] ${
                   isAREnabled
-                    ? 'border border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10'
-                    : 'bg-[#D96B27] shadow-saffron hover:bg-[#E87A35]'
+                    ? 'liquid-glass-pill border border-white/15 hover:border-white/25 hover:brightness-110'
+                    : 'liquid-glass-saffron border border-white/25 hover:brightness-110'
                 }`}
               >
                 {justAdded ? (

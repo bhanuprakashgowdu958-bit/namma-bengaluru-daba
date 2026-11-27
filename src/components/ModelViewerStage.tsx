@@ -19,7 +19,6 @@ import { DietaryBadge } from './DietaryBadge';
 
 export interface ModelViewerStageHandle {
   activateAR: () => Promise<boolean>;
-  reveal3D: () => void;
   resetView: () => void;
 }
 
@@ -31,7 +30,7 @@ interface ModelViewerStageProps {
   onARFailed?: (reason: string) => void;
 }
 
-const DEFAULT_ORBIT = '0deg 60deg 105%';
+const DEFAULT_ORBIT = '0deg 44deg 72%';
 
 /**
  * Shared 3D & WebAR Dish Studio Stage powered by @google/model-viewer.
@@ -51,20 +50,20 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     const [loadProgress, setLoadProgress] = useState(0);
     const [isLoaded, setIsLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
-    const [forceReveal3D, setForceReveal3D] = useState(false);
     const [showGestureHint, setShowGestureHint] = useState(false);
+    const [showHotspotCard, setShowHotspotCard] = useState(false);
 
     const hasAR = Boolean(item.hasAR && item.modelGlb);
-    const hasInteractive3D = Boolean(hasAR && (item.hasCustom3DScan || forceReveal3D));
-    const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=6` : undefined;
+    const hasInteractive3D = Boolean(hasAR && item.hasCustom3DScan);
+    const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=10` : undefined;
     // Omit missing static /models/*.usdz paths so @google/model-viewer auto-exports USDZ on iOS via prepareUSDZ()
     const modelUsdzSrc =
       item.modelUsdz && !item.modelUsdz.startsWith('/models/')
-        ? `${item.modelUsdz}?v=6`
+        ? `${item.modelUsdz}?v=10`
         : undefined;
 
     useEffect(() => {
-      setForceReveal3D(false);
+      setShowHotspotCard(false);
     }, [item.id]);
 
     useEffect(() => {
@@ -88,8 +87,6 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           window.location.hash === '#ar-fallback'
         ) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
-          setForceReveal3D(true);
-          viewerRef.current?.dismissPoster?.();
           onARFailedRef.current?.(
             'Scene Viewer could not load this dish model. Make sure Google Play Services for AR is updated and the site is publicly accessible without login protection.'
           );
@@ -103,10 +100,8 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
       const handleArStatus = (event: Event) => {
         const customEvent = event as CustomEvent<{ status?: string }>;
         if (customEvent.detail?.status === 'failed') {
-          setForceReveal3D(true);
-          el?.dismissPoster?.();
           onARFailedRef.current?.(
-            'AR session could not start on this device. Interactive 3D view is unlocked above.'
+            'AR session could not start on this device. Open this menu on Safari (iOS) or Chrome (Android) for live table AR.'
           );
         }
       };
@@ -159,11 +154,6 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
       el.jumpCameraToGoal();
     };
 
-    const reveal3D = () => {
-      setForceReveal3D(true);
-      viewerRef.current?.dismissPoster?.();
-    };
-
     useImperativeHandle(ref, () => ({
       activateAR: async () => {
         const el = viewerRef.current;
@@ -176,9 +166,8 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
         // Scene Viewer intent:// URLs or AR Quick Look even if model-viewer
         // reports canActivateAR (UA detection quirks, responsive mode, etc.)
         if (!isAndroidDevice() && !isIOSDevice()) {
-          reveal3D();
           onARUnsupported?.(
-            'AR requires a mobile phone. Scan the QR code on your phone, or drag above to inspect in 3D.'
+            'AR requires a mobile phone. Scan the QR code on your phone to place this dish on your table.'
           );
           return false;
         }
@@ -201,7 +190,6 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             window.setTimeout(() => anchor.remove(), 100);
             return true;
           } catch {
-            reveal3D();
             onARUnsupported?.(
               'Could not launch AR. Make sure Google Play Services for AR is installed and updated.'
             );
@@ -232,13 +220,11 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           }
         }
 
-        reveal3D();
         onARUnsupported?.(
-          'AR Quick Look could not start. Try opening in Safari, or drag above to inspect in 3D.'
+          'AR Quick Look could not start. Try opening in Safari to place on your table.'
         );
         return false;
       },
-      reveal3D,
       resetView
     }));
 
@@ -270,16 +256,14 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             ar-placement="floor"
             reveal={hasInteractive3D ? 'auto' : 'manual'}
             camera-controls
-            auto-rotate
-            auto-rotate-delay="1200"
-            rotation-per-second="14deg"
             shadow-intensity="1.2"
             shadow-softness="0.85"
             exposure="1.0"
             environment-image="neutral"
             camera-orbit={DEFAULT_ORBIT}
-            min-camera-orbit="auto 20deg auto"
-            max-camera-orbit="auto 80deg auto"
+            field-of-view="24deg"
+            min-camera-orbit="auto 16deg 55%"
+            max-camera-orbit="auto 80deg 115%"
             interaction-prompt="none"
             touch-action="pan-y"
             loading={hasInteractive3D ? 'eager' : 'lazy'}
@@ -289,7 +273,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             {item.poster && (
               <div
                 slot="poster"
-                className="relative h-full w-full overflow-hidden bg-[#12100E]"
+                className="relative h-full w-full overflow-hidden bg-[#08080A]"
               >
                 <img
                   src={item.poster}
@@ -298,16 +282,62 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#12100E]/50 via-transparent to-[#12100E]/55"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
                 />
               </div>
             )}
             <span slot="ar-button" className="hidden" aria-hidden="true" />
           </model-viewer>
-        ) : (
+        ) : null}
+
+        {/* Minimalist Spatial AR Viewfinder Corner Brackets */}
+        {hasAR && (
+          <div aria-hidden="true" className="pointer-events-none absolute inset-3.5 z-10">
+            <span className="absolute left-0 top-0 h-4 w-4 rounded-tl-lg border-l border-t border-white/25" />
+            <span className="absolute right-0 top-0 h-4 w-4 rounded-tr-lg border-r border-t border-white/25" />
+            <span className="absolute bottom-0 left-0 h-4 w-4 rounded-bl-lg border-b border-l border-white/25" />
+            <span className="absolute bottom-0 right-0 h-4 w-4 rounded-br-lg border-b border-r border-white/25" />
+          </div>
+        )}
+
+        {/* Interactive Culinary Sensory Hotspot (QReal / 8th Wall spatial pattern) */}
+        {hasAR && item.description && !hasInteractive3D && (
+          <div className="absolute right-5 top-1/2 z-20 -translate-y-1/2">
+            <button
+              type="button"
+              onClick={() => setShowHotspotCard((prev) => !prev)}
+              aria-label="Inspect culinary details"
+              className="group relative flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-black/55 backdrop-blur-md transition hover:scale-110 active:scale-95"
+            >
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#D96B27]/45" />
+              <span className="relative h-2.5 w-2.5 rounded-full bg-[#D96B27] shadow-[0_0_10px_#D96B27]" />
+            </button>
+
+            <AnimatePresence>
+              {showHotspotCard && (
+                <motion.div
+                  initial={{ opacity: 0, x: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 8, scale: 0.96 }}
+                  transition={{ duration: 0.18 }}
+                  className="liquid-glass absolute right-12 top-1/2 w-56 -translate-y-1/2 rounded-2xl border border-white/20 p-3 text-left"
+                >
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#F4A26E]">
+                    Kitchen Notes • {item.realWorldDimensions ?? '1:1 Scale'}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[#F7F3EC]/90">
+                    {item.description}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {!hasAR && (
           <div className="relative z-10 flex flex-col items-center px-8 text-center">
-            <div className="flex h-24 w-24 items-center justify-center rounded-3xl border border-white/10 bg-[#1C1917]/80 shadow-glass">
-              <Box className="h-9 w-9 text-[#D96B27]/80" />
+            <div className="liquid-glass-card flex h-24 w-24 items-center justify-center rounded-3xl border border-white/15">
+              <Box className="h-9 w-9 text-[#D96B27]/85" />
             </div>
             <p className="mt-5 font-serif text-2xl font-semibold text-[#F7F3EC]">
               {item.name}
@@ -327,7 +357,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.2 }}
-              className="pointer-events-none absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-[#1C1917]/85 px-3 py-1.5 backdrop-blur-xl"
+              className="liquid-glass-pill pointer-events-none absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5"
             >
               <svg className="h-5 w-5 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
                 <circle
@@ -360,11 +390,11 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
         {/* Floating Top-Left Glass Pills */}
         {showMetadataPills && (
           <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2 pr-14">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/80 px-3 py-1.5 text-xs font-medium text-[#F7F3EC] backdrop-blur-xl">
+            <span className="liquid-glass-pill inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-[#F7F3EC]">
               <DietaryBadge type={item.diet} showLabel />
             </span>
             {hasAR && (
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D96B27]/35 bg-[#1C1917]/80 px-3 py-1.5 text-xs font-medium text-[#F4A26E] backdrop-blur-xl">
+              <span className="liquid-glass-pill inline-flex items-center gap-1.5 rounded-full border border-[#D96B27]/40 px-3 py-1.5 text-xs font-medium text-[#F4A26E]">
                 <Sparkles className="h-3 w-3 text-[#D96B27]" />
                 1:1 • {item.realWorldDimensions ?? 'True Scale'}
               </span>
@@ -372,16 +402,18 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           </div>
         )}
 
-        {/* Reset View Button (for interactive 360° 3D scans) */}
+        {/* Reset View Button (only if an item uses a custom Polycam/Luma 3D scan) */}
         {showMetadataPills && hasInteractive3D && (
-          <button
-            type="button"
-            onClick={resetView}
-            className="absolute bottom-4 left-4 z-20 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/85 px-3.5 text-xs font-medium text-[#F7F3EC]/95 backdrop-blur-xl transition hover:border-white/20 hover:bg-[#1C1917] active:scale-95"
-          >
-            <RotateCcw className="h-3.5 w-3.5 text-[#D96B27]" />
-            Reset View
-          </button>
+          <div className="absolute bottom-4 left-4 z-20 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={resetView}
+              className="liquid-glass-pill inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-white/20 px-3.5 text-xs font-medium text-[#F7F3EC]/95 transition hover:border-white/30 active:scale-95"
+            >
+              <RotateCcw className="h-3.5 w-3.5 text-[#D96B27]" />
+              Reset View
+            </button>
+          </div>
         )}
 
         {/* Auto-dismissing 360° Gesture Hint (only for interactive 360° 3D scans) */}
@@ -392,7 +424,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
               transition={{ duration: 0.25 }}
-              className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/10 bg-[#1C1917]/85 px-3.5 py-1.5 text-xs font-medium text-[#F7F3EC]/90 backdrop-blur-xl shadow-glass"
+              className="liquid-glass-pill pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 px-3.5 py-1.5 text-xs font-medium text-[#F7F3EC]/90"
             >
               <span className="inline-flex items-center gap-1.5">
                 <Move3d className="h-3.5 w-3.5 text-[#D96B27]" />

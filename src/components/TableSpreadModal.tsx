@@ -6,16 +6,20 @@ import {
   Box,
   Minus,
   Plus,
-  RotateCcw,
   Ruler,
   Sparkles,
   Users,
+  Utensils,
   X
 } from 'lucide-react';
 import { MENU_ITEMS } from '../data/menu';
 import type { CartItem, MenuItem, PriceVariant } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
-import { isMobileARCapableDevice } from '../utils/device';
+import {
+  buildSceneViewerIntentUrl,
+  isAndroidDevice,
+  isMobileARCapableDevice
+} from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import {
   buildTableSpreadModels,
@@ -33,32 +37,6 @@ interface TableSpreadModalProps {
   onOpenSpreadQR: (spreadUrl: string, title: string, subtitle: string) => void;
 }
 
-type TableToneId = 'charcoal' | 'teak' | 'stone';
-
-const TABLE_TONES: Record<
-  TableToneId,
-  { label: string; swatch: string; stageBg: string }
-> = {
-  charcoal: {
-    label: 'Dark Slate',
-    swatch: '#1E1A17',
-    stageBg: 'radial-gradient(circle at 50% 48%, rgba(36,31,27,0.98) 0%, rgba(18,16,14,1) 85%)'
-  },
-  teak: {
-    label: 'Warm Teak',
-    swatch: '#5C3A24',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(74,47,30,0.92) 0%, rgba(28,19,14,1) 86%)'
-  },
-  stone: {
-    label: 'Light Stone',
-    swatch: '#B9B0A4',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(92,86,78,0.88) 0%, rgba(26,23,20,1) 88%)'
-  }
-};
-
-const DESKTOP_SPREAD_ORBIT = '0deg 38deg 84%';
-const MOBILE_SPREAD_ORBIT = '0deg 40deg 106%';
-
 export function TableSpreadModal({
   isOpen,
   items,
@@ -73,25 +51,28 @@ export function TableSpreadModal({
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
   const [arNotice, setArNotice] = useState<string | null>(null);
-  const [tableTone, setTableTone] = useState<TableToneId>('charcoal');
-  const [isMobileViewport, setIsMobileViewport] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : true
-  );
-
-  useEffect(() => {
-    const onResize = () => setIsMobileViewport(window.innerWidth < 1024);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
-
-  const activeOrbit = isMobileViewport ? MOBILE_SPREAD_ORBIT : DESKTOP_SPREAD_ORBIT;
-  const activeFov = isMobileViewport ? '34deg' : '26deg';
 
   const totalDishes = items.reduce((sum, entry) => sum + entry.quantity, 0);
   const totalAmount = items.reduce(
     (sum, entry) => sum + entry.variant.price * entry.quantity,
     0
   );
+
+  // Respect exact cart dishes cleanly on the white table (up to 8 plates visually)
+  const displayPlates = useMemo(() => {
+    const plates: Array<{ key: string; entry: CartItem }> = [];
+    for (const entry of items) {
+      if (plates.length >= 8) break;
+      if (totalDishes <= 8) {
+        for (let i = 0; i < entry.quantity; i++) {
+          plates.push({ key: `${entry.cartKey}-${i}`, entry });
+        }
+      } else {
+        plates.push({ key: entry.cartKey, entry });
+      }
+    }
+    return plates.slice(0, 8);
+  }, [items, totalDishes]);
 
   // Suggest smart pairings if curries are added without breads/rice
   const suggestedPairing = useMemo(() => {
@@ -163,7 +144,7 @@ export function TableSpreadModal({
       const customEvent = event as CustomEvent<{ status?: string }>;
       if (customEvent.detail?.status === 'failed') {
         setArNotice(
-          'Table Spread AR session failed to start on this browser. Try tapping any single dish card for Scene Viewer AR, or inspect in 3D above.'
+          'Table Spread AR session failed to start on this browser. Try tapping any single dish card for Scene Viewer AR.'
         );
       }
     };
@@ -197,8 +178,28 @@ export function TableSpreadModal({
       return;
     }
 
+    // Single dish on Android: launch native Scene Viewer directly on exact dish GLB
+    if (isAndroidDevice() && totalDishes === 1 && items[0]?.item.modelGlb) {
+      try {
+        const intentUrl = buildSceneViewerIntentUrl(
+          `${items[0].item.modelGlb}?v=10`,
+          items[0].item.name
+        );
+        const anchor = document.createElement('a');
+        anchor.setAttribute('href', intentUrl);
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        window.setTimeout(() => anchor.remove(), 100);
+        return;
+      } catch {
+        // Fall through to WebXR
+      }
+    }
+
     const el = viewerRef.current;
-    if (el) {
+    if (el && spread?.arGlbUrl) {
+      el.src = spread.arGlbUrl;
       if (!el.canActivateAR) {
         for (let attempt = 0; attempt < 6; attempt += 1) {
           await new Promise((resolve) => window.setTimeout(resolve, 45));
@@ -227,23 +228,20 @@ export function TableSpreadModal({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
         transition={{ type: 'spring', stiffness: 360, damping: 34 }}
-        className="fixed inset-0 z-[60] flex flex-col bg-[#12100E]"
+        className="fixed inset-0 z-[60] flex flex-col bg-[#070709] lg:flex-row"
         role="dialog"
         aria-modal="true"
         aria-label="Full Table Spread 3D and AR Preview"
       >
-        {/* Top 52% (Mobile) / 58% (Desktop): Combined Multi-Dish 3D & AR Stage */}
-        <div
-          className="relative flex h-[52dvh] min-h-[310px] w-full shrink-0 flex-col overflow-hidden px-2 pb-16 pt-14 transition-colors duration-500 lg:h-[58dvh] lg:pb-14 lg:pt-12"
-          style={{ background: TABLE_TONES[tableTone].stageBg }}
-        >
+        {/* Top 56% (Mobile) / Left 62% Full-Height (Desktop): Zero-Gap Full-Bleed Dish Presentation */}
+        <div className="relative flex h-[56dvh] min-h-[320px] w-full shrink-0 flex-col overflow-hidden bg-[#070709] lg:h-full lg:w-[62%]">
           <div className="pointer-events-none absolute left-3.5 top-4 z-20 flex flex-wrap items-center gap-1.5 pr-14 sm:left-4 sm:gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D96B27]/40 bg-[#1C1917]/85 px-2.5 py-1 text-[11px] font-semibold text-[#F4A26E] backdrop-blur-xl sm:px-3 sm:py-1.5 sm:text-xs">
+            <span className="liquid-glass-pill inline-flex items-center gap-1.5 rounded-full border border-[#D96B27]/45 px-2.5 py-1 text-[11px] font-semibold text-[#F4A26E] sm:px-3 sm:py-1.5 sm:text-xs">
               <Sparkles className="h-3 w-3 text-[#D96B27] sm:h-3.5 sm:w-3.5" />
               Table Spread
             </span>
             {spread && (
-              <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-[#1C1917]/85 px-2.5 py-1 text-[11px] font-medium text-[#F7F3EC] backdrop-blur-xl sm:px-3 sm:py-1.5 sm:text-xs">
+              <span className="liquid-glass-pill inline-flex items-center gap-1 rounded-full border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-[#F7F3EC] sm:px-3 sm:py-1.5 sm:text-xs">
                 <Ruler className="h-3 w-3 text-[#D96B27] sm:h-3.5 sm:w-3.5" />
                 ~{spread.estimatedWidthCm} cm
               </span>
@@ -254,101 +252,102 @@ export function TableSpreadModal({
             type="button"
             onClick={onClose}
             aria-label="Close Table Spread"
-            className="absolute right-3.5 top-3.5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-[#1C1917]/85 text-[#F7F3EC] backdrop-blur-xl transition hover:bg-[#1C1917] active:scale-90 sm:right-4 sm:top-4"
+            className="liquid-glass-pill absolute right-3.5 top-3.5 z-30 flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-[#F7F3EC] transition hover:brightness-110 active:scale-90 sm:right-4 sm:top-4"
           >
             <X className="h-5 w-5" />
           </button>
 
-          {isBuilding ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <div className="h-9 w-9 animate-spin rounded-full border-2 border-white/15 border-t-[#D96B27]" />
-              <p className="text-xs font-medium text-[#A8A29E]">
-                Arranging {totalDishes} {totalDishes === 1 ? 'dish' : 'dishes'} on your table at 1:1 scale...
-              </p>
-            </div>
-          ) : buildError ? (
+          {buildError ? (
             <div className="flex h-full items-center justify-center px-6 text-center">
               <p className="text-sm text-red-400">{buildError}</p>
             </div>
-          ) : spread ? (
-            <model-viewer
-              key={spread.glbUrl}
-              ref={viewerRef}
-              src={spread.glbUrl}
-              ios-src={spread.usdzUrl}
-              alt="Your complete ordered meal spread in 3D"
-              ar
-              ar-modes="webxr quick-look"
-              ar-scale="fixed"
-              ar-placement="floor"
-              camera-controls
-              auto-rotate
-              auto-rotate-delay="900"
-              rotation-per-second="12deg"
-              shadow-intensity="1.2"
-              shadow-softness="0.85"
-              exposure="1.0"
-              environment-image="neutral"
-              camera-orbit={activeOrbit}
-              field-of-view={activeFov}
-              min-camera-orbit="auto 16deg auto"
-              max-camera-orbit="auto 78deg auto"
-              interaction-prompt="none"
-              touch-action="pan-y"
-              className="h-full w-full flex-1"
-            >
-              <span slot="ar-button" className="hidden" aria-hidden="true" />
-            </model-viewer>
-          ) : null}
-
-          {/* Bottom-Left Reset + Table Tone Swatches */}
-          {spread && !isBuilding && (
-            <div className="absolute bottom-3 left-3.5 z-20 flex items-center gap-2 sm:bottom-4 sm:left-4">
-              <button
-                type="button"
-                onClick={() => {
-                  const el = viewerRef.current;
-                  if (!el) return;
-                  el.resetTurntableRotation();
-                  el.cameraOrbit = activeOrbit;
-                  el.jumpCameraToGoal();
-                }}
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/85 px-3.5 text-xs font-medium text-[#F7F3EC] backdrop-blur-xl transition hover:border-white/20 active:scale-95"
-              >
-                <RotateCcw className="h-3.5 w-3.5 text-[#D96B27]" />
-                Reset
-              </button>
-
+          ) : displayPlates.length === 1 ? (
+            /* Single Dish Full-Bleed Edge-to-Edge Studio Photograph (zero white gaps) */
+            <div className="relative h-full w-full">
+              {displayPlates[0].entry.item.poster ? (
+                <img
+                  src={displayPlates[0].entry.item.poster}
+                  alt={displayPlates[0].entry.item.name}
+                  className="h-full w-full object-cover object-center"
+                />
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-[#F7F3EC]">
+                  <Utensils className="h-10 w-10 text-[#D96B27]" />
+                  <span className="font-serif text-lg">{displayPlates[0].entry.item.name}</span>
+                </div>
+              )}
               <div
-                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/85 px-2.5 backdrop-blur-xl"
-                title="Adjust table background tone"
-              >
-                <span className="hidden text-[11px] text-[#A8A29E] sm:inline">Table:</span>
-                {(Object.keys(TABLE_TONES) as TableToneId[]).map((toneId) => {
-                  const tone = TABLE_TONES[toneId];
-                  const active = tableTone === toneId;
-                  return (
-                    <button
-                      key={toneId}
-                      type="button"
-                      onClick={() => setTableTone(toneId)}
-                      aria-label={`Match ${tone.label} table color`}
-                      className={`h-6 w-6 rounded-full border transition active:scale-90 ${
-                        active
-                          ? 'scale-110 border-[#D96B27] ring-2 ring-[#D96B27]/40'
-                          : 'border-white/25 opacity-80 hover:opacity-100'
-                      }`}
-                      style={{ backgroundColor: tone.swatch }}
-                    />
-                  );
-                })}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60"
+              />
+              <div className="pointer-events-none absolute bottom-4 left-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/55 px-4 py-1.5 text-xs font-semibold text-[#F7F3EC] backdrop-blur-xl">
+                <span>{displayPlates[0].entry.item.name}</span>
+                <span className="text-[#A8A29E]">•</span>
+                <span className="tabular-nums text-[#F4A26E]">
+                  {formatINR(displayPlates[0].entry.variant.price)}
+                </span>
               </div>
+            </div>
+          ) : (
+            /* Multi-Dish Full-Bleed Spread Grid (zero white gaps) */
+            <div
+              className={`grid h-full w-full gap-1 bg-[#070709] ${
+                displayPlates.length <= 2
+                  ? 'grid-cols-2'
+                  : displayPlates.length <= 4
+                    ? 'grid-cols-2 grid-rows-2'
+                    : displayPlates.length <= 6
+                      ? 'grid-cols-3 grid-rows-2'
+                      : 'grid-cols-4 grid-rows-2'
+              }`}
+            >
+              {displayPlates.map(({ key, entry }) => (
+                <div key={key} className="relative h-full w-full overflow-hidden bg-[#101013]">
+                  {entry.item.poster ? (
+                    <img
+                      src={entry.item.poster}
+                      alt={entry.item.name}
+                      className="h-full w-full object-cover object-center"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-[#D96B27]">
+                      <Utensils className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent"
+                  />
+                  <span className="liquid-glass-pill pointer-events-none absolute bottom-2 left-2 max-w-[88%] truncate rounded-full border border-white/20 px-2.5 py-0.5 text-[10px] font-semibold text-[#F7F3EC]">
+                    {entry.item.name}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Background Model-Viewer kept solely for native 1:1 AR Table Placement */}
+          {spread && (
+            <div className="pointer-events-none absolute h-1 w-1 overflow-hidden opacity-0" aria-hidden="true">
+              <model-viewer
+                key={spread.arGlbUrl}
+                ref={viewerRef}
+                src={spread.arGlbUrl}
+                ios-src={spread.usdzUrl}
+                alt="AR Table Spread Engine"
+                ar
+                ar-modes="webxr quick-look"
+                ar-scale="fixed"
+                ar-placement="floor"
+              >
+                <span slot="ar-button" className="hidden" />
+              </model-viewer>
             </div>
           )}
         </div>
 
-        {/* Bottom 42%: Live Spread Chips with Dish Thumbnails, Pairing & Dual Actions */}
-        <div className="flex flex-1 flex-col justify-between overflow-y-auto rounded-t-3xl border-t border-white/10 bg-[#1C1917]/95 px-5 pb-6 pt-4 backdrop-blur-2xl">
+        {/* Bottom Sheet (Mobile) / Right Side Editorial Glass Panel (Desktop) */}
+        <div className="liquid-glass-sheet flex flex-1 flex-col justify-between overflow-y-auto rounded-t-3xl border-t border-white/15 px-5 pb-6 pt-5 lg:h-full lg:w-[38%] lg:rounded-none lg:border-l lg:border-t-0 lg:px-7 lg:py-8">
           <div>
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -366,28 +365,30 @@ export function TableSpreadModal({
             </div>
 
             {/* Live Tray Dish Chips with Studio Thumbnails */}
-            <div className="no-scrollbar mt-3 flex items-center gap-2.5 overflow-x-auto pb-1">
+            <div className="no-scrollbar mt-3 flex items-center gap-2.5 overflow-x-auto pb-1 lg:mt-5 lg:flex-col lg:items-stretch lg:gap-2.5 lg:overflow-visible">
               {items.map((entry) => (
                 <div
                   key={entry.cartKey}
-                  className="flex shrink-0 items-center gap-2.5 rounded-2xl border border-white/10 bg-[#12100E]/85 p-2 pr-2.5"
+                  className="liquid-glass-card flex shrink-0 items-center justify-between gap-2.5 rounded-2xl border border-white/15 p-2 pr-2.5 lg:p-3"
                 >
-                  {entry.item.poster && (
-                    <img
-                      src={entry.item.poster}
-                      alt={entry.item.name}
-                      className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-cover"
-                    />
-                  )}
-                  <div className="max-w-[135px]">
-                    <p className="truncate text-xs font-medium text-[#F7F3EC]">
-                      {entry.item.name}
-                    </p>
-                    <p className="text-[10px] tabular-nums text-[#A8A29E]">
-                      {entry.variant.label} • {formatINR(entry.variant.price)}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {entry.item.poster && (
+                      <img
+                        src={entry.item.poster}
+                        alt={entry.item.name}
+                        className="h-10 w-10 shrink-0 rounded-xl border border-white/10 object-cover lg:h-12 lg:w-12"
+                      />
+                    )}
+                    <div className="max-w-[135px] lg:max-w-none">
+                      <p className="truncate text-xs font-medium text-[#F7F3EC] lg:text-sm">
+                        {entry.item.name}
+                      </p>
+                      <p className="text-[10px] tabular-nums text-[#A8A29E] lg:text-xs">
+                        {entry.variant.label} • {formatINR(entry.variant.price)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
+                  <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
                       onClick={() => onUpdateQuantity(entry.cartKey, -1)}
@@ -440,12 +441,12 @@ export function TableSpreadModal({
             )}
           </div>
 
-          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row">
+          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row lg:flex-col">
             <button
               type="button"
               onClick={handleActivateAR}
               disabled={!spread || isBuilding}
-              className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98] disabled:opacity-50"
+              className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
             >
               <Box className="h-[18px] w-[18px]" />
               Place Full Spread on Table (AR)
@@ -454,7 +455,7 @@ export function TableSpreadModal({
             <button
               type="button"
               onClick={onProceedToOrder}
-              className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:bg-white/10 active:scale-[0.98]"
+              className="liquid-glass-pill flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110 active:scale-[0.98]"
             >
               <span>Proceed to Order</span>
               <ArrowRight className="h-4 w-4 text-[#F4A26E]" />
