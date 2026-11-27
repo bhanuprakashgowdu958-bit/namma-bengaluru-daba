@@ -55,14 +55,8 @@ export function DishARModal({
   const handleViewOnTable = async () => {
     setArHintMessage(null);
     const launched = await stageRef.current?.activateAR();
-    if (!launched) {
-      if (onFallbackDesktopQR) {
-        onFallbackDesktopQR(item);
-      } else {
-        setArHintMessage(
-          'Open in Safari (iOS) or Chrome (Android) to place this dish at 1:1 scale on your table.'
-        );
-      }
+    if (!launched && onFallbackDesktopQR) {
+      onFallbackDesktopQR(item);
     }
   };
 
@@ -94,11 +88,13 @@ export function DishARModal({
             <ModelViewerStage
               ref={stageRef}
               item={item}
-              onARUnsupported={() =>
+              onARUnsupported={(reason) =>
                 setArHintMessage(
-                  'AR Quick Look / WebXR requires Safari on iOS or Chrome on Android.'
+                  reason ??
+                    'Open in Safari (iOS) or Chrome (Android) to place this dish at 1:1 scale on your table.'
                 )
               }
+              onARFailed={(reason) => setArHintMessage(reason)}
             />
 
             <button

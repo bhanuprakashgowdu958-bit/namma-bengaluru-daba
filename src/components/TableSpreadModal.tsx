@@ -177,8 +177,20 @@ export function TableSpreadModal({
     const el = viewerRef.current;
     if (!el || !spread) return;
     const onLoad = () => applyBambooTone(tableTone);
+    const onArStatus = (event: Event) => {
+      const customEvent = event as CustomEvent<{ status?: string }>;
+      if (customEvent.detail?.status === 'failed') {
+        setArNotice(
+          'Table Spread AR session failed to start on this browser. Try tapping any single dish card for Scene Viewer AR, or inspect in 3D above.'
+        );
+      }
+    };
     el.addEventListener('load', onLoad);
-    return () => el.removeEventListener('load', onLoad);
+    el.addEventListener('ar-status', onArStatus);
+    return () => {
+      el.removeEventListener('load', onLoad);
+      el.removeEventListener('ar-status', onArStatus);
+    };
   }, [spread, tableTone]);
 
   if (!isOpen) return null;
@@ -206,12 +218,20 @@ export function TableSpreadModal({
     }
 
     const el = viewerRef.current;
-    if (el && el.canActivateAR) {
-      try {
-        await el.activateAR();
-        return;
-      } catch {
-        // Handled below
+    if (el) {
+      if (!el.canActivateAR) {
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 45));
+          if (el.canActivateAR) break;
+        }
+      }
+      if (el.canActivateAR) {
+        try {
+          await el.activateAR();
+          return;
+        } catch {
+          // Handled below
+        }
       }
     }
 

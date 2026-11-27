@@ -10,10 +10,16 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Move3d, RotateCcw, Sparkles } from 'lucide-react';
 import type { MenuItem } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
+import {
+  buildSceneViewerIntentUrl,
+  isAndroidDevice,
+  isIOSDevice
+} from '../utils/device';
 import { DietaryBadge } from './DietaryBadge';
 
 export interface ModelViewerStageHandle {
   activateAR: () => Promise<boolean>;
+  reveal3D: () => void;
   resetView: () => void;
 }
 
@@ -21,7 +27,8 @@ interface ModelViewerStageProps {
   item: MenuItem;
   showMetadataPills?: boolean;
   className?: string;
-  onARUnsupported?: () => void;
+  onARUnsupported?: (reason?: string) => void;
+  onARFailed?: (reason: string) => void;
 }
 
 const DEFAULT_ORBIT = '0deg 60deg 105%';
@@ -34,19 +41,31 @@ const DEFAULT_ORBIT = '0deg 60deg 105%';
  */
 export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerStageProps>(
   function ModelViewerStage(
-    { item, showMetadataPills = true, className = '', onARUnsupported },
+    { item, showMetadataPills = true, className = '', onARUnsupported, onARFailed },
     ref
   ) {
     const viewerRef = useRef<ModelViewerElement | null>(null);
+    const onARFailedRef = useRef(onARFailed);
+    onARFailedRef.current = onARFailed;
+
     const [loadProgress, setLoadProgress] = useState(0);
     const [isLoaded, setIsLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
+    const [forceReveal3D, setForceReveal3D] = useState(false);
     const [showGestureHint, setShowGestureHint] = useState(false);
 
     const hasAR = Boolean(item.hasAR && item.modelGlb);
-    const hasInteractive3D = Boolean(hasAR && item.hasCustom3DScan);
+    const hasInteractive3D = Boolean(hasAR && (item.hasCustom3DScan || forceReveal3D));
     const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=5` : undefined;
-    const modelUsdzSrc = item.modelUsdz ? `${item.modelUsdz}?v=5` : undefined;
+    // Omit missing static /models/*.usdz paths so @google/model-viewer auto-exports USDZ on iOS via prepareUSDZ()
+    const modelUsdzSrc =
+      item.modelUsdz && !item.modelUsdz.startsWith('/models/')
+        ? `${item.modelUsdz}?v=5`
+        : undefined;
+
+    useEffect(() => {
+      setForceReveal3D(false);
+    }, [item.id]);
 
     useEffect(() => {
       setLoadProgress(0);
@@ -61,6 +80,43 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
 
       return () => window.clearTimeout(timer);
     }, [item.id, hasInteractive3D]);
+
+    useEffect(() => {
+      const handleFallbackHash = () => {
+        if (
+          window.location.hash === '#model-viewer-no-ar-fallback' ||
+          window.location.hash === '#ar-fallback'
+        ) {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          setForceReveal3D(true);
+          viewerRef.current?.dismissPoster?.();
+          onARFailedRef.current?.(
+            'Scene Viewer could not load this dish model. Make sure Google Play Services for AR is updated and the site is publicly accessible without login protection.'
+          );
+        }
+      };
+
+      handleFallbackHash();
+      window.addEventListener('hashchange', handleFallbackHash);
+
+      const el = viewerRef.current;
+      const handleArStatus = (event: Event) => {
+        const customEvent = event as CustomEvent<{ status?: string }>;
+        if (customEvent.detail?.status === 'failed') {
+          setForceReveal3D(true);
+          el?.dismissPoster?.();
+          onARFailedRef.current?.(
+            'AR session could not start on this device. Interactive 3D view is unlocked above.'
+          );
+        }
+      };
+
+      el?.addEventListener('ar-status', handleArStatus);
+      return () => {
+        window.removeEventListener('hashchange', handleFallbackHash);
+        el?.removeEventListener('ar-status', handleArStatus);
+      };
+    }, [item.id]);
 
     useEffect(() => {
       const el = viewerRef.current;
@@ -103,16 +159,79 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
       el.jumpCameraToGoal();
     };
 
+    const reveal3D = () => {
+      setForceReveal3D(true);
+      viewerRef.current?.dismissPoster?.();
+    };
+
     useImperativeHandle(ref, () => ({
       activateAR: async () => {
         const el = viewerRef.current;
-        if (el && el.canActivateAR) {
-          await el.activateAR();
-          return true;
+        if (!el || !modelGlbSrc) {
+          onARUnsupported?.('AR preview is still initializing. Please try again.');
+          return false;
         }
-        onARUnsupported?.();
+
+        // AR requires a real mobile device — desktop browsers cannot handle
+        // Scene Viewer intent:// URLs or AR Quick Look even if model-viewer
+        // reports canActivateAR (UA detection quirks, responsive mode, etc.)
+        const isMobile = isAndroidDevice() || isIOSDevice();
+        if (!isMobile) {
+          reveal3D();
+          onARUnsupported?.(
+            'AR requires a mobile phone. Scan the QR code on your phone, or drag above to inspect in 3D.'
+          );
+          return false;
+        }
+
+        // On real mobile: preserve synchronous user-gesture token when model-viewer AR is ready
+        if (el.canActivateAR) {
+          try {
+            await el.activateAR();
+            return true;
+          } catch {
+            // Fall through to Android intent or 3D inspection fallback
+          }
+        }
+
+        // Direct Scene Viewer launch for Android (bypasses async WebXR checks, desktop-mode flags,
+        // custom Chromium UAs, or recovery after a blocked Scene Viewer state)
+        if (isAndroidDevice()) {
+          try {
+            const intentUrl = buildSceneViewerIntentUrl(modelGlbSrc, item.name);
+            const anchor = document.createElement('a');
+            anchor.setAttribute('href', intentUrl);
+            anchor.click();
+            return true;
+          } catch {
+            // Fall through to 3D inspection fallback
+          }
+        }
+
+        // iOS: wait briefly for async $selectARMode() resolution
+        for (let attempt = 0; attempt < 5; attempt += 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 45));
+          if (el.canActivateAR) {
+            try {
+              await el.activateAR();
+              return true;
+            } catch {
+              break;
+            }
+          }
+        }
+
+        reveal3D();
+        const reason = isIOSDevice()
+          ? 'Open in Safari or Chrome on iOS for 1:1 AR Quick Look. Interactive 3D view is unlocked above.'
+          : isAndroidDevice()
+            ? 'AR requires Chrome & Google Play Services for AR. Interactive 3D view is unlocked above.'
+            : 'Open on Safari (iOS) or Chrome (Android) for 1:1 table AR, or drag above to inspect in 3D.';
+
+        onARUnsupported?.(reason);
         return false;
       },
+      reveal3D,
       resetView
     }));
 
@@ -139,7 +258,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             poster={item.poster}
             alt={`${item.name} studio dish preview`}
             ar
-            ar-modes="webxr scene-viewer quick-look"
+            ar-modes="scene-viewer webxr quick-look"
             ar-scale="fixed"
             ar-placement="floor"
             reveal={hasInteractive3D ? 'auto' : 'manual'}

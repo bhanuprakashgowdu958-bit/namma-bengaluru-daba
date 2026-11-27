@@ -30,6 +30,7 @@ export interface ModelViewerElement extends HTMLElement {
     }>;
   };
   activateAR: () => Promise<void>;
+  dismissPoster?: () => void;
   resetTurntableRotation: () => void;
   jumpCameraToGoal: () => void;
 }
