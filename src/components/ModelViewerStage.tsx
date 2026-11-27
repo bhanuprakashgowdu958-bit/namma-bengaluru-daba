@@ -56,11 +56,11 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
 
     const hasAR = Boolean(item.hasAR && item.modelGlb);
     const hasInteractive3D = Boolean(hasAR && (item.hasCustom3DScan || forceReveal3D));
-    const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=5` : undefined;
+    const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=6` : undefined;
     // Omit missing static /models/*.usdz paths so @google/model-viewer auto-exports USDZ on iOS via prepareUSDZ()
     const modelUsdzSrc =
       item.modelUsdz && !item.modelUsdz.startsWith('/models/')
-        ? `${item.modelUsdz}?v=5`
+        ? `${item.modelUsdz}?v=6`
         : undefined;
 
     useEffect(() => {

@@ -37,25 +37,22 @@ type TableToneId = 'charcoal' | 'teak' | 'stone';
 
 const TABLE_TONES: Record<
   TableToneId,
-  { label: string; swatch: string; stageBg: string; bambooTint: [number, number, number, number] }
+  { label: string; swatch: string; stageBg: string }
 > = {
   charcoal: {
     label: 'Dark Slate',
     swatch: '#1E1A17',
-    stageBg: 'radial-gradient(circle at 50% 48%, rgba(36,31,27,0.98) 0%, rgba(18,16,14,1) 85%)',
-    bambooTint: [0.54, 0.45, 0.37, 1]
+    stageBg: 'radial-gradient(circle at 50% 48%, rgba(36,31,27,0.98) 0%, rgba(18,16,14,1) 85%)'
   },
   teak: {
     label: 'Warm Teak',
     swatch: '#5C3A24',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(74,47,30,0.92) 0%, rgba(28,19,14,1) 86%)',
-    bambooTint: [0.82, 0.72, 0.62, 1]
+    stageBg: 'radial-gradient(circle at 50% 52%, rgba(74,47,30,0.92) 0%, rgba(28,19,14,1) 86%)'
   },
   stone: {
     label: 'Light Stone',
     swatch: '#B9B0A4',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(92,86,78,0.88) 0%, rgba(26,23,20,1) 88%)',
-    bambooTint: [1.08, 1.02, 0.94, 1]
+    stageBg: 'radial-gradient(circle at 50% 52%, rgba(92,86,78,0.88) 0%, rgba(26,23,20,1) 88%)'
   }
 };
 
@@ -159,24 +156,9 @@ export function TableSpreadModal({
     };
   }, [isOpen, items]);
 
-  const applyBambooTone = (tone: TableToneId) => {
-    const materials = viewerRef.current?.model?.materials;
-    if (!materials) return;
-    for (const mat of materials) {
-      if (mat.name === 'HandcraftedBamboo') {
-        mat.pbrMetallicRoughness.setBaseColorFactor(TABLE_TONES[tone].bambooTint);
-      }
-    }
-  };
-
-  useEffect(() => {
-    applyBambooTone(tableTone);
-  }, [tableTone, spread]);
-
   useEffect(() => {
     const el = viewerRef.current;
     if (!el || !spread) return;
-    const onLoad = () => applyBambooTone(tableTone);
     const onArStatus = (event: Event) => {
       const customEvent = event as CustomEvent<{ status?: string }>;
       if (customEvent.detail?.status === 'failed') {
@@ -185,13 +167,11 @@ export function TableSpreadModal({
         );
       }
     };
-    el.addEventListener('load', onLoad);
     el.addEventListener('ar-status', onArStatus);
     return () => {
-      el.removeEventListener('load', onLoad);
       el.removeEventListener('ar-status', onArStatus);
     };
-  }, [spread, tableTone]);
+  }, [spread]);
 
   if (!isOpen) return null;
 
@@ -341,7 +321,7 @@ export function TableSpreadModal({
 
               <div
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/85 px-2.5 backdrop-blur-xl"
-                title="Adjust bamboo tone for your table color"
+                title="Adjust table background tone"
               >
                 <span className="hidden text-[11px] text-[#A8A29E] sm:inline">Table:</span>
                 {(Object.keys(TABLE_TONES) as TableToneId[]).map((toneId) => {

@@ -196,7 +196,7 @@ export function DishARModal({
             {isAREnabled &&
               (isAndroidDevice() && item.modelGlb ? (
                 <a
-                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=5`, item.name)}
+                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=6`, item.name)}
                   onClick={() => setArHintMessage(null)}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
                 >

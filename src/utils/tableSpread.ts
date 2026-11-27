@@ -62,13 +62,12 @@ function loadPosterPlateTexture(posterUrl: string): Promise<THREE.Texture | null
           return;
         }
 
-        // Crop into the center circular plate region of the studio poster so outer
-        // table slate margins don't appear as dark corners inside the 3D bowl rim
-        const cropFraction = 0.72;
+        // Crop into the center plate region of the studio poster cleanly without outer table margins
+        const cropFraction = 0.78;
         const sw = img.naturalWidth * cropFraction;
         const sh = img.naturalHeight * cropFraction;
         const sx = (img.naturalWidth - sw) * 0.5;
-        const sy = (img.naturalHeight - sh) * 0.56;
+        const sy = (img.naturalHeight - sh) * 0.55;
 
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
 
@@ -97,8 +96,8 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
   if (totalQty <= MAX_PLATES) {
     for (const entry of items) {
       const url = entry.item.modelGlb
-        ? `${entry.item.modelGlb}?v=5`
-        : '/models/dal-tadka.glb?v=5';
+        ? `${entry.item.modelGlb}?v=6`
+        : '/models/dal-tadka.glb?v=6';
       for (let i = 0; i < entry.quantity; i++) {
         plates.push({ url, poster: entry.item.poster, label: entry.item.name });
       }
@@ -109,8 +108,8 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
   for (const entry of items) {
     if (plates.length >= MAX_PLATES) break;
     const url = entry.item.modelGlb
-      ? `${entry.item.modelGlb}?v=5`
-      : '/models/dal-tadka.glb?v=5';
+      ? `${entry.item.modelGlb}?v=6`
+      : '/models/dal-tadka.glb?v=6';
     plates.push({ url, poster: entry.item.poster, label: entry.item.name });
   }
   return plates;
