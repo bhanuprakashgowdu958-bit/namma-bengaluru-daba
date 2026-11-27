@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Search, X } from 'lucide-react';
-import { MENU_CATEGORIES, RESTAURANT_CONFIG } from '../data/menu';
+import { MENU_CATEGORIES, MENU_ITEMS, RESTAURANT_CONFIG } from '../data/menu';
 import type { MenuCategory } from '../types/menu';
 
 export type CategoryFilter = 'All' | MenuCategory;
@@ -17,6 +17,42 @@ interface HeaderFiltersProps {
 
 const ALL_CATEGORIES: CategoryFilter[] = ['All', ...MENU_CATEGORIES];
 
+const CATEGORY_BANNERS: Record<
+  CategoryFilter,
+  { poster: string; vegPoster?: string }
+> = {
+  All: {
+    poster: '/posters/butter-chicken.jpg',
+    vegPoster: '/posters/aloo-paratha.jpg'
+  },
+  Breakfast: {
+    poster: '/posters/aloo-paratha.jpg'
+  },
+  'Other Delights': {
+    poster: '/posters/donne-biryani.jpg',
+    vegPoster: '/posters/amritsari-kulcha.jpg'
+  },
+  Chinese: {
+    poster: '/posters/chilli-paneer.jpg'
+  },
+  'Chinese Combos': {
+    poster: '/posters/chinese-combo.jpg'
+  },
+  'Kathi Rolls': {
+    poster: '/posters/chicken-cheese-roll.jpg',
+    vegPoster: '/posters/paneer-tikka-roll.jpg'
+  },
+  'Veg Main Course': {
+    poster: '/posters/kadai-paneer.jpg'
+  },
+  'Non-Veg Main Course': {
+    poster: '/posters/butter-chicken.jpg'
+  },
+  Breads: {
+    poster: '/posters/garlic-naan.jpg'
+  }
+};
+
 export function HeaderFilters({
   vegOnly,
   onToggleVegOnly,
@@ -26,6 +62,18 @@ export function HeaderFilters({
   onSearchChange
 }: HeaderFiltersProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<CategoryFilter, number>();
+    let total = 0;
+    for (const item of MENU_ITEMS) {
+      if (vegOnly && item.diet !== 'veg') continue;
+      total += 1;
+      counts.set(item.category, (counts.get(item.category) ?? 0) + 1);
+    }
+    counts.set('All', total);
+    return counts;
+  }, [vegOnly]);
 
   const toggleSearch = () => {
     if (isSearchOpen) {
@@ -162,25 +210,78 @@ export function HeaderFilters({
         </div>
       )}
 
-      {/* Horizontal Scrollable Category Tabs */}
+      {/* Horizontal Scrollable Category Photo Banners */}
       <nav
         aria-label="Menu categories"
         className="no-scrollbar flex items-center gap-2 overflow-x-auto px-4 pb-3 pt-1 sm:px-5"
       >
         {ALL_CATEGORIES.map((category) => {
           const isActive = activeCategory === category;
+          const banner = CATEGORY_BANNERS[category];
+          const posterSrc =
+            vegOnly && banner.vegPoster ? banner.vegPoster : banner.poster;
+          const count = categoryCounts.get(category) ?? 0;
+
           return (
             <button
               key={category}
               type="button"
               onClick={() => onSelectCategory(category)}
-              className={`min-h-[40px] shrink-0 rounded-full border px-4 text-xs font-medium transition active:scale-95 ${
+              aria-pressed={isActive}
+              className={`group relative flex h-[58px] min-w-[106px] shrink-0 flex-col justify-between overflow-hidden rounded-2xl border px-3 py-2 text-left transition active:scale-95 ${
                 isActive
-                  ? 'liquid-glass-saffron border-white/30 text-[#F7F3EC]'
-                  : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
+                  ? 'border-[#D96B27] shadow-[0_0_0_1px_rgba(217,107,39,0.55),0_10px_24px_-8px_rgba(217,107,39,0.65)]'
+                  : 'border-white/15 hover:border-white/30'
               }`}
             >
-              {category}
+              <img
+                src={posterSrc}
+                alt=""
+                aria-hidden="true"
+                loading="eager"
+                decoding="async"
+                className={`pointer-events-none absolute inset-0 h-full w-full object-cover object-center transition duration-500 group-hover:scale-105 ${
+                  isActive ? 'opacity-95' : 'opacity-65 group-hover:opacity-85'
+                }`}
+              />
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-0 transition ${
+                  isActive
+                    ? 'bg-gradient-to-t from-[#120D0A]/95 via-[#120D0A]/55 to-[#D96B27]/20'
+                    : 'bg-gradient-to-t from-[#0D0B0A]/95 via-[#0D0B0A]/65 to-black/35'
+                }`}
+              />
+
+              <div className="relative z-10 flex w-full items-center justify-between gap-2">
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full transition ${
+                    isActive
+                      ? 'bg-[#D96B27] shadow-[0_0_8px_rgba(217,107,39,0.95)]'
+                      : 'bg-white/35'
+                  }`}
+                />
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold tabular-nums backdrop-blur-md ${
+                    isActive
+                      ? 'bg-[#D96B27] text-[#F7F3EC]'
+                      : 'border border-white/15 bg-black/50 text-[#D6D0C8]'
+                  }`}
+                >
+                  {count}
+                </span>
+              </div>
+
+              <span className="relative z-10 whitespace-nowrap font-serif text-[12.5px] font-semibold leading-none tracking-tight text-[#F7F3EC]">
+                {category}
+              </span>
+
+              {isActive && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[2.5px] bg-[#D96B27]"
+                />
+              )}
             </button>
           );
         })}
