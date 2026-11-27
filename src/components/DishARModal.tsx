@@ -2,11 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Check, Minus, Plus, X } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
-import {
-  buildSceneViewerIntentUrl,
-  getVersionedModelUrl,
-  isAndroidDevice
-} from '../utils/device';
+import { buildSceneViewerIntentUrl, isAndroidDevice } from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import { DietaryBadge } from './DietaryBadge';
 import { ModelViewerStage, type ModelViewerStageHandle } from './ModelViewerStage';
@@ -93,7 +89,6 @@ export function DishARModal({
             <ModelViewerStage
               ref={stageRef}
               item={item}
-              touchAction="none"
               onARUnsupported={(reason) =>
                 setArHintMessage(
                   reason ??
@@ -201,7 +196,7 @@ export function DishARModal({
             {isAREnabled &&
               (isAndroidDevice() && item.modelGlb ? (
                 <a
-                  href={buildSceneViewerIntentUrl(getVersionedModelUrl(item.modelGlb), item.name)}
+                  href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=5`, item.name)}
                   onClick={() => setArHintMessage(null)}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#D96B27] px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] shadow-saffron transition hover:bg-[#E87A35] active:scale-[0.98]"
                 >
@@ -218,11 +213,6 @@ export function DishARModal({
                   <span>View on Your Table (AR)</span>
                 </button>
               ))}
-            {isAREnabled && (
-              <p className="text-center text-[11px] text-[#A8A29E]">
-                Aim at a flat, well-lit dining table &amp; pan slowly so the dish locks steadily.
-              </p>
-            )}
 
             <div className="flex items-center gap-2.5">
               <div className="flex min-h-[48px] items-center rounded-2xl border border-white/10 bg-[#12100E] px-1.5 py-1">

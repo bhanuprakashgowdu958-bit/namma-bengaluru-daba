@@ -15,12 +15,7 @@ import {
 import { MENU_ITEMS } from '../data/menu';
 import type { CartItem, MenuItem, PriceVariant } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
-import {
-  buildSceneViewerIntentUrl,
-  getVersionedModelUrl,
-  isAndroidDevice,
-  isMobileARCapableDevice
-} from '../utils/device';
+import { isMobileARCapableDevice } from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import {
   buildTableSpreadModels,
@@ -38,29 +33,29 @@ interface TableSpreadModalProps {
   onOpenSpreadQR: (spreadUrl: string, title: string, subtitle: string) => void;
 }
 
-type TableToneId = 'obsidian' | 'slate' | 'stone';
+type TableToneId = 'charcoal' | 'teak' | 'stone';
 
 const TABLE_TONES: Record<
   TableToneId,
-  { label: string; swatch: string; stageBg: string; stonewareTint: [number, number, number, number] }
+  { label: string; swatch: string; stageBg: string; bambooTint: [number, number, number, number] }
 > = {
-  obsidian: {
-    label: 'Dark Obsidian',
+  charcoal: {
+    label: 'Dark Slate',
     swatch: '#1E1A17',
     stageBg: 'radial-gradient(circle at 50% 48%, rgba(36,31,27,0.98) 0%, rgba(18,16,14,1) 85%)',
-    stonewareTint: [1.0, 1.0, 1.0, 1]
+    bambooTint: [0.54, 0.45, 0.37, 1]
   },
-  slate: {
-    label: 'Warm Slate',
-    swatch: '#463C34',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(62,48,38,0.92) 0%, rgba(22,18,15,1) 86%)',
-    stonewareTint: [1.35, 1.25, 1.15, 1]
+  teak: {
+    label: 'Warm Teak',
+    swatch: '#5C3A24',
+    stageBg: 'radial-gradient(circle at 50% 52%, rgba(74,47,30,0.92) 0%, rgba(28,19,14,1) 86%)',
+    bambooTint: [0.82, 0.72, 0.62, 1]
   },
   stone: {
     label: 'Light Stone',
-    swatch: '#9B9388',
-    stageBg: 'radial-gradient(circle at 50% 52%, rgba(86,80,74,0.88) 0%, rgba(24,21,18,1) 88%)',
-    stonewareTint: [1.85, 1.75, 1.65, 1]
+    swatch: '#B9B0A4',
+    stageBg: 'radial-gradient(circle at 50% 52%, rgba(92,86,78,0.88) 0%, rgba(26,23,20,1) 88%)',
+    bambooTint: [1.08, 1.02, 0.94, 1]
   }
 };
 
@@ -81,8 +76,7 @@ export function TableSpreadModal({
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildError, setBuildError] = useState<string | null>(null);
   const [arNotice, setArNotice] = useState<string | null>(null);
-  const [arTrackingNote, setArTrackingNote] = useState<string | null>(null);
-  const [tableTone, setTableTone] = useState<TableToneId>('obsidian');
+  const [tableTone, setTableTone] = useState<TableToneId>('charcoal');
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth < 1024 : true
   );
@@ -165,53 +159,37 @@ export function TableSpreadModal({
     };
   }, [isOpen, items]);
 
-  const applyStonewareTone = (tone: TableToneId) => {
+  const applyBambooTone = (tone: TableToneId) => {
     const materials = viewerRef.current?.model?.materials;
     if (!materials) return;
     for (const mat of materials) {
-      if (mat.name === 'DarkStoneware' || mat.name === 'HandcraftedBamboo') {
-        mat.pbrMetallicRoughness.setBaseColorFactor(TABLE_TONES[tone].stonewareTint);
+      if (mat.name === 'HandcraftedBamboo') {
+        mat.pbrMetallicRoughness.setBaseColorFactor(TABLE_TONES[tone].bambooTint);
       }
     }
   };
 
   useEffect(() => {
-    applyStonewareTone(tableTone);
+    applyBambooTone(tableTone);
   }, [tableTone, spread]);
 
   useEffect(() => {
     const el = viewerRef.current;
     if (!el || !spread) return;
-    const onLoad = () => applyStonewareTone(tableTone);
+    const onLoad = () => applyBambooTone(tableTone);
     const onArStatus = (event: Event) => {
       const customEvent = event as CustomEvent<{ status?: string }>;
-      const status = customEvent.detail?.status;
-      if (status === 'failed') {
-        setArTrackingNote(null);
+      if (customEvent.detail?.status === 'failed') {
         setArNotice(
           'Table Spread AR session failed to start on this browser. Try tapping any single dish card for Scene Viewer AR, or inspect in 3D above.'
         );
-      } else if (status === 'session-started') {
-        setArTrackingNote('Aim slowly at a flat, well-lit dining table to lock spread');
-      } else if (status === 'object-placed') {
-        setArTrackingNote('Surface locked • Drag to move spread, twist 2 fingers to rotate 360°');
-      } else if (status === 'not-presenting') {
-        setArTrackingNote(null);
-      }
-    };
-    const onArTracking = (event: Event) => {
-      const customEvent = event as CustomEvent<{ status?: string }>;
-      if (customEvent.detail?.status === 'not-tracking') {
-        setArTrackingNote('Keep camera over a flat, textured table (avoid keyboards/glass)');
       }
     };
     el.addEventListener('load', onLoad);
     el.addEventListener('ar-status', onArStatus);
-    el.addEventListener('ar-tracking', onArTracking);
     return () => {
       el.removeEventListener('load', onLoad);
       el.removeEventListener('ar-status', onArStatus);
-      el.removeEventListener('ar-tracking', onArTracking);
     };
   }, [spread, tableTone]);
 
@@ -237,25 +215,6 @@ export function TableSpreadModal({
         `True 1:1 Scale • ${widthLabel}`
       );
       return;
-    }
-
-    // For a single dish on Android, native Scene Viewer gives steadier plane lock than WebXR
-    if (isAndroidDevice() && totalDishes === 1 && items[0]?.item.modelGlb) {
-      try {
-        const intentUrl = buildSceneViewerIntentUrl(
-          getVersionedModelUrl(items[0].item.modelGlb),
-          items[0].item.name
-        );
-        const anchor = document.createElement('a');
-        anchor.setAttribute('href', intentUrl);
-        anchor.style.display = 'none';
-        document.body.appendChild(anchor);
-        anchor.click();
-        window.setTimeout(() => anchor.remove(), 100);
-        return;
-      } catch {
-        // Fall through to WebXR
-      }
     }
 
     const el = viewerRef.current;
@@ -355,14 +314,9 @@ export function TableSpreadModal({
               min-camera-orbit="auto 16deg auto"
               max-camera-orbit="auto 78deg auto"
               interaction-prompt="none"
-              touch-action="none"
+              touch-action="pan-y"
               className="h-full w-full flex-1"
             >
-              {arTrackingNote && (
-                <div className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-[#12100E]/85 px-3.5 py-1.5 text-[11px] font-medium text-[#F7F3EC] backdrop-blur-xl">
-                  {arTrackingNote}
-                </div>
-              )}
               <span slot="ar-button" className="hidden" aria-hidden="true" />
             </model-viewer>
           ) : null}
@@ -387,7 +341,7 @@ export function TableSpreadModal({
 
               <div
                 className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/10 bg-[#1C1917]/85 px-2.5 backdrop-blur-xl"
-                title="Adjust stoneware tone for your table color"
+                title="Adjust bamboo tone for your table color"
               >
                 <span className="hidden text-[11px] text-[#A8A29E] sm:inline">Table:</span>
                 {(Object.keys(TABLE_TONES) as TableToneId[]).map((toneId) => {

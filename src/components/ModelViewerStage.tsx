@@ -12,7 +12,6 @@ import type { MenuItem } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
 import {
   buildSceneViewerIntentUrl,
-  getVersionedModelUrl,
   isAndroidDevice,
   isIOSDevice
 } from '../utils/device';
@@ -27,29 +26,22 @@ export interface ModelViewerStageHandle {
 interface ModelViewerStageProps {
   item: MenuItem;
   showMetadataPills?: boolean;
-  touchAction?: 'none' | 'pan-y';
   className?: string;
   onARUnsupported?: (reason?: string) => void;
   onARFailed?: (reason: string) => void;
 }
 
-const DEFAULT_ORBIT = '0deg 46deg 102%';
+const DEFAULT_ORBIT = '0deg 60deg 105%';
 
 /**
  * Shared 3D & WebAR Dish Studio Stage powered by @google/model-viewer.
- * Renders each dish on matte dark stoneware matching the menu photograph with
- * full 360° interactive spin, auto-rotate showcase, and 1:1 WebAR tabletop placement.
+ * Displays the high-contrast studio food photograph cleanly while keeping
+ * 1:1 WebAR ("View on Your Table") ready; auto-reveals 360° 3D mesh when
+ * `item.hasCustom3DScan` is enabled with a real Polycam/Luma scan.
  */
 export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerStageProps>(
   function ModelViewerStage(
-    {
-      item,
-      showMetadataPills = true,
-      touchAction = 'pan-y',
-      className = '',
-      onARUnsupported,
-      onARFailed
-    },
+    { item, showMetadataPills = true, className = '', onARUnsupported, onARFailed },
     ref
   ) {
     const viewerRef = useRef<ModelViewerElement | null>(null);
@@ -59,29 +51,32 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     const [loadProgress, setLoadProgress] = useState(0);
     const [isLoaded, setIsLoaded] = useState(false);
     const [hasError, setHasError] = useState(false);
+    const [forceReveal3D, setForceReveal3D] = useState(false);
     const [showGestureHint, setShowGestureHint] = useState(false);
-    const [arTrackingNote, setArTrackingNote] = useState<string | null>(null);
 
     const hasAR = Boolean(item.hasAR && item.modelGlb);
-    const hasInteractive3D = hasAR;
-    const modelGlbSrc = item.modelGlb ? getVersionedModelUrl(item.modelGlb) : undefined;
+    const hasInteractive3D = Boolean(hasAR && (item.hasCustom3DScan || forceReveal3D));
+    const modelGlbSrc = item.modelGlb ? `${item.modelGlb}?v=5` : undefined;
     // Omit missing static /models/*.usdz paths so @google/model-viewer auto-exports USDZ on iOS via prepareUSDZ()
     const modelUsdzSrc =
       item.modelUsdz && !item.modelUsdz.startsWith('/models/')
-        ? getVersionedModelUrl(item.modelUsdz)
+        ? `${item.modelUsdz}?v=5`
         : undefined;
+
+    useEffect(() => {
+      setForceReveal3D(false);
+    }, [item.id]);
 
     useEffect(() => {
       setLoadProgress(0);
       setIsLoaded(false);
       setHasError(false);
-      setArTrackingNote(null);
       setShowGestureHint(hasInteractive3D);
 
       if (!hasInteractive3D) return;
       const timer = window.setTimeout(() => {
         setShowGestureHint(false);
-      }, 2800);
+      }, 2000);
 
       return () => window.clearTimeout(timer);
     }, [item.id, hasInteractive3D]);
@@ -93,9 +88,10 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           window.location.hash === '#ar-fallback'
         ) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          setForceReveal3D(true);
           viewerRef.current?.dismissPoster?.();
           onARFailedRef.current?.(
-            'Scene Viewer could not load this dish model. Make sure Google Play Services for AR is updated and point at a flat, well-lit table.'
+            'Scene Viewer could not load this dish model. Make sure Google Play Services for AR is updated and the site is publicly accessible without login protection.'
           );
         }
       };
@@ -106,35 +102,19 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
       const el = viewerRef.current;
       const handleArStatus = (event: Event) => {
         const customEvent = event as CustomEvent<{ status?: string }>;
-        const status = customEvent.detail?.status;
-        if (status === 'failed') {
-          setArTrackingNote(null);
+        if (customEvent.detail?.status === 'failed') {
+          setForceReveal3D(true);
           el?.dismissPoster?.();
           onARFailedRef.current?.(
-            'AR session could not start on this device. Interactive 360° 3D view is active above.'
+            'AR session could not start on this device. Interactive 3D view is unlocked above.'
           );
-        } else if (status === 'session-started') {
-          setArTrackingNote('Slowly aim at a flat, well-lit dining table to lock in place');
-        } else if (status === 'object-placed') {
-          setArTrackingNote('Surface locked • Drag to move, twist 2 fingers to rotate 360°');
-        } else if (status === 'not-presenting') {
-          setArTrackingNote(null);
-        }
-      };
-
-      const handleArTracking = (event: Event) => {
-        const customEvent = event as CustomEvent<{ status?: string }>;
-        if (customEvent.detail?.status === 'not-tracking') {
-          setArTrackingNote('Keep camera over a flat, textured table (avoid keyboards/glass)');
         }
       };
 
       el?.addEventListener('ar-status', handleArStatus);
-      el?.addEventListener('ar-tracking', handleArTracking);
       return () => {
         window.removeEventListener('hashchange', handleFallbackHash);
         el?.removeEventListener('ar-status', handleArStatus);
-        el?.removeEventListener('ar-tracking', handleArTracking);
       };
     }, [item.id]);
 
@@ -180,6 +160,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     };
 
     const reveal3D = () => {
+      setForceReveal3D(true);
       viewerRef.current?.dismissPoster?.();
     };
 
@@ -287,28 +268,23 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             ar-modes="scene-viewer webxr quick-look"
             ar-scale="fixed"
             ar-placement="floor"
-            reveal="auto"
+            reveal={hasInteractive3D ? 'auto' : 'manual'}
             camera-controls
             auto-rotate
-            auto-rotate-delay="500"
-            rotation-per-second="18deg"
+            auto-rotate-delay="1200"
+            rotation-per-second="14deg"
             shadow-intensity="1.2"
             shadow-softness="0.85"
-            exposure="1.05"
+            exposure="1.0"
             environment-image="neutral"
             camera-orbit={DEFAULT_ORBIT}
-            min-camera-orbit="auto 14deg auto"
-            max-camera-orbit="auto 84deg auto"
+            min-camera-orbit="auto 20deg auto"
+            max-camera-orbit="auto 80deg auto"
             interaction-prompt="none"
-            touch-action={touchAction}
-            loading="eager"
+            touch-action="pan-y"
+            loading={hasInteractive3D ? 'eager' : 'lazy'}
             className="relative z-10 h-full w-full"
           >
-            {arTrackingNote && (
-              <div className="pointer-events-none absolute left-1/2 top-16 z-30 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/15 bg-[#12100E]/85 px-3.5 py-1.5 text-[11px] font-medium text-[#F7F3EC] backdrop-blur-xl">
-                {arTrackingNote}
-              </div>
-            )}
             {/* Full-bleed Studio Food Photograph Poster Slot (zero side gaps) */}
             {item.poster && (
               <div
@@ -420,7 +396,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             >
               <span className="inline-flex items-center gap-1.5">
                 <Move3d className="h-3.5 w-3.5 text-[#D96B27]" />
-                Drag 360° to inspect dish
+                Drag to inspect dish
               </span>
             </motion.div>
           )}

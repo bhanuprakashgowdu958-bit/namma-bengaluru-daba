@@ -50,13 +50,6 @@ export function buildSceneViewerIntentUrl(glbPath: string, title?: string): stri
   );
 }
 
-export const MODEL_ASSET_VERSION = 'v6';
-
-export function getVersionedModelUrl(modelPath: string): string {
-  const separator = modelPath.includes('?') ? '&' : '?';
-  return `${modelPath}${separator}v=${MODEL_ASSET_VERSION}`;
-}
-
 export function getDishDeepLinkUrl(dishId: string): string {
   if (typeof window === 'undefined') return `?dish=${encodeURIComponent(dishId)}`;
   const url = new URL(window.location.href);

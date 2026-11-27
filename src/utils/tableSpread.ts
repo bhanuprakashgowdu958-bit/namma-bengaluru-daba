@@ -3,7 +3,6 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 import type { CartItem } from '../types/menu';
-import { getVersionedModelUrl } from './device';
 
 export interface TableSpreadResult {
   glbUrl: string;
@@ -63,12 +62,13 @@ function loadPosterPlateTexture(posterUrl: string): Promise<THREE.Texture | null
           return;
         }
 
-        // Crop cleanly into the dish plate composition so the studio photo fills the stoneware plate
-        const cropFraction = 0.84;
+        // Crop into the center circular plate region of the studio poster so outer
+        // table slate margins don't appear as dark corners inside the 3D bowl rim
+        const cropFraction = 0.72;
         const sw = img.naturalWidth * cropFraction;
         const sh = img.naturalHeight * cropFraction;
         const sx = (img.naturalWidth - sw) * 0.5;
-        const sy = (img.naturalHeight - sh) * 0.54;
+        const sy = (img.naturalHeight - sh) * 0.56;
 
         ctx.drawImage(img, sx, sy, sw, sh, 0, 0, size, size);
 
@@ -94,23 +94,13 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
   const totalQty = items.reduce((sum, entry) => sum + entry.quantity, 0);
   const plates: PlateSpec[] = [];
 
-  const toPlate = (entry: CartItem): PlateSpec => {
-    const rawUrl = entry.item.modelGlb || '/models/dal-tadka.glb';
-    const glbSlug = rawUrl.replace(/^\/models\//, '').replace(/\.glb$/, '');
-    const posterSlug = entry.item.poster?.replace(/^\/posters\//, '').replace(/\.jpg$/, '');
-    const needsFallbackTexture = Boolean(entry.item.poster && glbSlug !== posterSlug);
-    return {
-      url: getVersionedModelUrl(rawUrl),
-      poster: needsFallbackTexture ? entry.item.poster : undefined,
-      label: entry.item.name
-    };
-  };
-
   if (totalQty <= MAX_PLATES) {
     for (const entry of items) {
-      const spec = toPlate(entry);
+      const url = entry.item.modelGlb
+        ? `${entry.item.modelGlb}?v=5`
+        : '/models/dal-tadka.glb?v=5';
       for (let i = 0; i < entry.quantity; i++) {
-        plates.push(spec);
+        plates.push({ url, poster: entry.item.poster, label: entry.item.name });
       }
     }
     return plates;
@@ -118,7 +108,10 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
 
   for (const entry of items) {
     if (plates.length >= MAX_PLATES) break;
-    plates.push(toPlate(entry));
+    const url = entry.item.modelGlb
+      ? `${entry.item.modelGlb}?v=5`
+      : '/models/dal-tadka.glb?v=5';
+    plates.push({ url, poster: entry.item.poster, label: entry.item.name });
   }
   return plates;
 }
