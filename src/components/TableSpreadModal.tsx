@@ -31,6 +31,7 @@ import {
   getSpreadDeepLinkUrl,
   type TableSpreadResult
 } from '../utils/tableSpread';
+import { startAnchoredTableAR } from '../utils/webxrTableAR';
 
 interface TableSpreadModalProps {
   isOpen: boolean;
@@ -253,6 +254,19 @@ export function TableSpreadModal({
       return;
     }
 
+    if (isAndroid && canUseWebXR && spread?.arGlbUrl) {
+      try {
+        await startAnchoredTableAR({
+          glbUrl: spread.arGlbUrl,
+          title: `Table Spread (${totalDishes} ${totalDishes === 1 ? 'Plate' : 'Plates'})`,
+          onError: (msg) => setArNotice(msg)
+        });
+        return;
+      } catch {
+        // Fall back to model-viewer AR below
+      }
+    }
+
     const el = viewerRef.current;
     if (el && el.canActivateAR) {
       try {
@@ -445,6 +459,9 @@ export function TableSpreadModal({
                 ar-modes="webxr scene-viewer quick-look"
                 ar-scale="fixed"
                 ar-placement="floor"
+                shadow-intensity="1.2"
+                shadow-softness="0.85"
+                environment-image="neutral"
                 className="h-full w-full"
               >
                 <span slot="ar-button" className="hidden" />

@@ -17,6 +17,7 @@ import {
   isIOSDevice,
   isSceneViewerCandidate
 } from '../utils/device';
+import { startAnchoredTableAR } from '../utils/webxrTableAR';
 import { DietaryBadge } from './DietaryBadge';
 
 export interface ModelViewerStageHandle {
@@ -187,9 +188,21 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           return false;
         }
 
-        // Prefer in-browser WebXR on Android Chrome when supported, else Scene Viewer
+        // Prefer hardware-anchored Three.js WebXR on Android Chrome when supported, else Scene Viewer
         if (isAndroidDevice()) {
-          if (isWebXRSupported && el.canActivateAR) {
+          if (isWebXRSupported) {
+            try {
+              await startAnchoredTableAR({
+                glbUrl: modelGlbSrc,
+                title: item.name,
+                onError: (msg) => onARFailedRef.current?.(msg)
+              });
+              return true;
+            } catch {
+              // Fall back to model-viewer / Scene Viewer below
+            }
+          }
+          if (el.canActivateAR) {
             try {
               await el.activateAR();
               return true;
@@ -364,6 +377,9 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
               ar-modes="webxr scene-viewer quick-look"
               ar-scale="fixed"
               ar-placement="floor"
+              shadow-intensity="1.2"
+              shadow-softness="0.85"
+              environment-image="neutral"
               reveal="manual"
               loading="eager"
               className="h-full w-full"
