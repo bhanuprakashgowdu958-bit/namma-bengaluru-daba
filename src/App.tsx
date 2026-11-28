@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Check, ChevronLeft, ChevronRight, Minus, Plus, Ruler, Sparkles } from 'lucide-react';
 import { DesktopQRModal } from './components/DesktopQRModal';
@@ -14,10 +14,36 @@ import { MENU_ITEMS } from './data/menu';
 import type { CartItem, MenuItem, PriceVariant } from './types/menu';
 import { buildCartKey, formatINR, getDefaultVariant } from './utils/format';
 
+const AdminPortal = lazy(() =>
+  import('./components/AdminPortal').then((m) => ({ default: m.AdminPortal }))
+);
+
 const DEFAULT_HERO_ITEM =
   MENU_ITEMS.find((item) => item.hasAR) ?? MENU_ITEMS[0];
 
 export default function App() {
+  const isAdminRoute =
+    typeof window !== 'undefined' &&
+    /^\/admin(?:\/|$)/i.test(window.location.pathname);
+
+  if (isAdminRoute) {
+    return (
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center bg-[#070709] text-sm text-[#A8A29E]">
+            Loading Admin Portal…
+          </div>
+        }
+      >
+        <AdminPortal />
+      </Suspense>
+    );
+  }
+
+  return <CustomerMenuApp />;
+}
+
+function CustomerMenuApp() {
   const [vegOnly, setVegOnly] = useState(false);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('All');
   const [searchQuery, setSearchQuery] = useState('');
