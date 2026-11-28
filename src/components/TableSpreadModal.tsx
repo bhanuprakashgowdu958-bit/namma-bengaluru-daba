@@ -194,15 +194,6 @@ export function TableSpreadModal({
     };
   }, [spread]);
 
-  if (!isOpen) return null;
-
-  const estimatedGuests =
-    totalDishes <= 1
-      ? '1 guest'
-      : totalDishes <= 3
-        ? '1–2 guests'
-        : `${Math.ceil(totalDishes / 1.5)} guests`;
-
   const isAndroid = isAndroidDevice();
   const androidSceneViewerUrl = useMemo(() => {
     if (!isAndroid || items.length === 0) return null;
@@ -215,6 +206,15 @@ export function TableSpreadModal({
     const spreadTitle = `Table Spread (${totalDishes} Plates)`;
     return buildSceneViewerIntentUrl(getSpreadApiGlbPath(items), spreadTitle);
   }, [isAndroid, items, totalDishes]);
+
+  if (!isOpen) return null;
+
+  const estimatedGuests =
+    totalDishes <= 1
+      ? '1 guest'
+      : totalDishes <= 3
+        ? '1–2 guests'
+        : `${Math.ceil(totalDishes / 1.5)} guests`;
 
   const handleActivateAR = async () => {
     setArNotice(null);

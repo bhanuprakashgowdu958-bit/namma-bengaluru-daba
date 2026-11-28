@@ -85,6 +85,49 @@ export function MenuCatalog({
     [items]
   );
 
+  const renderCategoryItems = (sectionItems: MenuItem[]) => {
+    const photoDishes = sectionItems.filter((entry) => Boolean(entry.poster && entry.hasAR));
+    const standardDishes = sectionItems.filter((entry) => !(entry.poster && entry.hasAR));
+
+    return (
+      <div className="space-y-3">
+        {photoDishes.length > 0 && (
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            {photoDishes.map((item) => (
+              <MenuCard
+                key={item.id}
+                item={item}
+                variantLayout="grid"
+                isSelectedOnDesktop={selectedItemId === item.id}
+                getVariantQuantity={getVariantQuantity}
+                onAddVariant={onAddVariant}
+                onDecrementVariant={onDecrementVariant}
+                onInspectAR={onInspectAR}
+              />
+            ))}
+          </div>
+        )}
+
+        {standardDishes.length > 0 && (
+          <div className="space-y-2">
+            {standardDishes.map((item) => (
+              <MenuCard
+                key={item.id}
+                item={item}
+                variantLayout="row"
+                isSelectedOnDesktop={selectedItemId === item.id}
+                getVariantQuantity={getVariantQuantity}
+                onAddVariant={onAddVariant}
+                onDecrementVariant={onDecrementVariant}
+                onInspectAR={onInspectAR}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col pb-28 lg:pb-24">
       <HeaderFilters
@@ -241,36 +284,12 @@ export function MenuCatalog({
                   </span>
                 </div>
 
-                <div className="space-y-2.5">
-                  {categoryItems.map((item) => (
-                    <MenuCard
-                      key={item.id}
-                      item={item}
-                      isSelectedOnDesktop={selectedItemId === item.id}
-                      getVariantQuantity={getVariantQuantity}
-                      onAddVariant={onAddVariant}
-                      onDecrementVariant={onDecrementVariant}
-                      onInspectAR={onInspectAR}
-                    />
-                  ))}
-                </div>
+                {renderCategoryItems(categoryItems)}
               </div>
             ))}
           </div>
         ) : (
-          <div className="space-y-2.5">
-            {items.map((item) => (
-              <MenuCard
-                key={item.id}
-                item={item}
-                isSelectedOnDesktop={selectedItemId === item.id}
-                getVariantQuantity={getVariantQuantity}
-                onAddVariant={onAddVariant}
-                onDecrementVariant={onDecrementVariant}
-                onInspectAR={onInspectAR}
-              />
-            ))}
-          </div>
+          renderCategoryItems(items)
         )}
       </section>
     </div>
