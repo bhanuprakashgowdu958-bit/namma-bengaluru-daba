@@ -67,8 +67,13 @@ export function HeaderFilters({
 }: HeaderFiltersProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const isFirstRenderRef = useRef(true);
 
   useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
     const activeBtn = tabRefs.current[activeCategory];
     activeBtn?.scrollIntoView({
       behavior: 'smooth',

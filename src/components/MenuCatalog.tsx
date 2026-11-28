@@ -224,37 +224,29 @@ export function MenuCatalog({
         </div>
       )}
 
-      {/* 3D Book Page-Turn Viewport (Tap category or swipe left/right) */}
+      {/* Menu Page-Turn Viewport (Fast GPU slide without 3D preserve-3d flicker on mobile) */}
       <div
-        style={{ perspective: 1500 }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="overflow-x-hidden"
+        className="overflow-x-clip"
       >
-        <AnimatePresence mode="wait" custom={pageDirection}>
+        <AnimatePresence mode="popLayout" initial={false} custom={pageDirection}>
           <motion.div
             key={activeCategory}
             custom={pageDirection}
             initial={{
               opacity: 0,
-              rotateY: pageDirection > 0 ? 14 : -14,
-              x: pageDirection > 0 ? 32 : -32
+              x: pageDirection > 0 ? 36 : -36
             }}
             animate={{
               opacity: 1,
-              rotateY: 0,
               x: 0
             }}
             exit={{
               opacity: 0,
-              rotateY: pageDirection > 0 ? -14 : 14,
-              x: pageDirection > 0 ? -32 : 32
+              x: pageDirection > 0 ? -24 : 24
             }}
-            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-            style={{
-              transformOrigin: pageDirection > 0 ? 'left center' : 'right center',
-              transformStyle: 'preserve-3d'
-            }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
 
       {/* Mobile Editorial Chef's AR Spotlight */}

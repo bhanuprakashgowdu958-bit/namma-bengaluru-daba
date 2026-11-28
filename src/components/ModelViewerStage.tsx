@@ -245,7 +245,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
             initial={{ opacity: 0.35, scale: 1.08, clipPath: 'circle(0% at 50% 50%)' }}
             animate={{ opacity: 1, scale: 1, clipPath: 'circle(150% at 50% 50%)' }}
             exit={{ opacity: 0, scale: 0.96, clipPath: 'circle(0% at 50% 50%)' }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
             className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden"
           >
             {/* Expanding Saffron Spotlight Iris Ring */}
@@ -253,10 +253,28 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
               aria-hidden="true"
               initial={{ scale: 0.15, opacity: 0.9 }}
               animate={{ scale: 1.9, opacity: 0 }}
-              transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
               className="pointer-events-none absolute z-20 h-64 w-64 rounded-full border-2 border-[#F4A26E]/65 shadow-[0_0_48px_rgba(217,107,39,0.55)]"
             />
 
+            {/* Direct zero-flash Studio Food Photo for instant 60fps Iris reveal */}
+            {hasAR && item.poster && !hasInteractive3D && (
+              <div className="relative z-10 h-full w-full overflow-hidden bg-[#08080A]">
+                <img
+                  src={item.poster}
+                  alt={item.name}
+                  loading="eager"
+                  decoding="sync"
+                  className="h-full w-full object-cover object-center"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
+                />
+              </div>
+            )}
+
+            {/* Keep model-viewer mounted for 3D scans & iOS Quick Look / WebXR AR */}
             {hasAR ? (
               <model-viewer
                 ref={viewerRef}
@@ -281,25 +299,12 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
                 interaction-prompt="none"
                 touch-action="pan-y"
                 loading={hasInteractive3D ? 'eager' : 'lazy'}
-                className="relative z-10 h-full w-full"
+                className={
+                  hasInteractive3D
+                    ? 'relative z-10 h-full w-full'
+                    : 'pointer-events-none absolute inset-0 z-0 h-full w-full opacity-0'
+                }
               >
-                {/* Full-bleed Studio Food Photograph Poster Slot (zero side gaps) */}
-                {item.poster && (
-                  <div
-                    slot="poster"
-                    className="relative h-full w-full overflow-hidden bg-[#08080A]"
-                  >
-                    <img
-                      src={item.poster}
-                      alt={item.name}
-                      className="h-full w-full object-cover object-center"
-                    />
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
-                    />
-                  </div>
-                )}
                 <span slot="ar-button" className="hidden" aria-hidden="true" />
               </model-viewer>
             ) : null}

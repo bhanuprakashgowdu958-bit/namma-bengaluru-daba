@@ -246,6 +246,22 @@ export default function App() {
     });
   };
 
+  const isAnyOverlayOpen =
+    showMenuCover ||
+    Boolean(mobileModalItem) ||
+    isTrayOpen ||
+    isSpreadOpen ||
+    Boolean(qrModalItem || spreadQrPayload);
+
+  useEffect(() => {
+    if (!isAnyOverlayOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isAnyOverlayOpen]);
+
   return (
     <div className="relative min-h-screen bg-[#070709] text-[#F7F3EC]">
       <MenuCoverOverlay
@@ -432,7 +448,7 @@ export default function App() {
         </aside>
 
         {/* RIGHT (45% on Desktop, 100% on Mobile): Menu Catalog */}
-        <main className="mx-auto w-full max-w-lg overflow-x-hidden lg:mx-0 lg:w-[45%] lg:max-w-none">
+        <main className="mx-auto w-full max-w-lg overflow-x-clip lg:mx-0 lg:w-[45%] lg:max-w-none">
           <MenuCatalog
             items={filteredItems}
             selectedItemId={desktopActiveItem.id}

@@ -47,13 +47,12 @@ export function DishARModal({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [item, onClose]);
 
-  if (!item) return null;
-
-  const activeVariant = selectedVariant ?? getDefaultVariant(item);
-  const totalLinePrice = activeVariant.price * quantity;
-  const isAREnabled = Boolean(item.hasAR && item.modelGlb);
+  const activeVariant = item ? (selectedVariant ?? getDefaultVariant(item)) : null;
+  const totalLinePrice = activeVariant ? activeVariant.price * quantity : 0;
+  const isAREnabled = Boolean(item?.hasAR && item?.modelGlb);
 
   const handleViewOnTable = async () => {
+    if (!item) return;
     setArHintMessage(null);
     const launched = await stageRef.current?.activateAR();
     if (!launched && onFallbackDesktopQR) {
@@ -62,6 +61,7 @@ export function DishARModal({
   };
 
   const handleAdd = () => {
+    if (!item || !activeVariant) return;
     onAddToTray(item, activeVariant, quantity);
     setJustAdded(true);
     window.setTimeout(() => setJustAdded(false), 1400);
@@ -69,6 +69,7 @@ export function DishARModal({
 
   return (
     <AnimatePresence>
+      {item && activeVariant && (
       <motion.div
         key={item.id}
         initial={{ opacity: 0 }}
@@ -281,6 +282,7 @@ export function DishARModal({
           </motion.div>
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }
