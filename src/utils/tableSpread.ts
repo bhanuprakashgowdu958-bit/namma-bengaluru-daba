@@ -119,8 +119,8 @@ function expandCartToPlates(items: CartItem[]): PlateSpec[] {
 }
 
 /**
- * Builds the Vercel API path for a server-merged multi-dish GLB so Android Scene Viewer
- * can load 2+ dishes over HTTPS (Scene Viewer rejects client-side blob: URLs).
+ * Builds a clean path-only `.glb` URL for the server-merged multi-dish spread
+ * (no query params or commas so Google Scene Viewer never double-encodes `file=`).
  */
 export function getSpreadApiGlbPath(items: CartItem[]): string {
   const plates = expandCartToPlates(items);
@@ -128,7 +128,7 @@ export function getSpreadApiGlbPath(items: CartItem[]): string {
     const match = plate.url.match(/\/models\/([a-z0-9-]+)\.glb/i);
     return match ? match[1].toLowerCase() : 'dal-tadka';
   });
-  return `/api/spread.glb?models=${encodeURIComponent(slugs.join(','))}`;
+  return `/api/spread/${slugs.join('--')}.glb`;
 }
 
 /**

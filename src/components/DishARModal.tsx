@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Check, Minus, Plus, X } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
-import { buildSceneViewerIntentUrl, isAndroidDevice } from '../utils/device';
+import {
+  buildOpenInChromeIntentUrl,
+  buildSceneViewerIntentUrl,
+  checkWebXRSupported,
+  isAndroidDevice,
+  isInAppWebView,
+  isSceneViewerCandidate
+} from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import { DietaryBadge } from './DietaryBadge';
 import { ModelViewerStage, type ModelViewerStageHandle } from './ModelViewerStage';
@@ -29,6 +36,7 @@ export function DishARModal({
   const [quantity, setQuantity] = useState(1);
   const [justAdded, setJustAdded] = useState(false);
   const [arHintMessage, setArHintMessage] = useState<string | null>(null);
+  const [canUseWebXR, setCanUseWebXR] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -36,6 +44,13 @@ export function DishARModal({
     setQuantity(1);
     setJustAdded(false);
     setArHintMessage(null);
+    let active = true;
+    checkWebXRSupported().then((supported) => {
+      if (active) setCanUseWebXR(supported);
+    });
+    return () => {
+      active = false;
+    };
   }, [item]);
 
   useEffect(() => {
@@ -215,7 +230,15 @@ export function DishARModal({
             className="mt-5 space-y-2.5 pt-1"
           >
             {isAREnabled &&
-              (isAndroidDevice() && item.modelGlb ? (
+              (isAndroidDevice() && isInAppWebView() ? (
+                <a
+                  href={buildOpenInChromeIntentUrl()}
+                  className="liquid-glass-saffron flex w-full items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 py-3.5 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  <span>Open in Chrome for Table AR</span>
+                </a>
+              ) : isAndroidDevice() && item.modelGlb && !canUseWebXR && isSceneViewerCandidate() ? (
                 <a
                   href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=10`, item.name)}
                   onClick={() => setArHintMessage(null)}
@@ -234,6 +257,17 @@ export function DishARModal({
                   <span>View on Your Table (AR)</span>
                 </button>
               ))}
+
+            {isAREnabled && arHintMessage && isAndroidDevice() && item.modelGlb && isSceneViewerCandidate() && canUseWebXR && (
+              <a
+                href={buildSceneViewerIntentUrl(`${item.modelGlb}?v=10`, item.name)}
+                onClick={() => setArHintMessage(null)}
+                className="liquid-glass-pill flex w-full items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/50 px-4 py-3 text-xs font-semibold text-[#F4A26E] transition hover:brightness-110 active:scale-[0.98]"
+              >
+                <Box className="h-4 w-4" />
+                <span>Try Google Scene Viewer (AR)</span>
+              </a>
+            )}
 
             <div className="flex items-center gap-2.5">
               <div className="liquid-glass-pill flex min-h-[48px] items-center rounded-2xl border border-white/15 px-1.5 py-1">

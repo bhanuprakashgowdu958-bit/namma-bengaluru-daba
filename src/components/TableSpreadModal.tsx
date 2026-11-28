@@ -16,9 +16,13 @@ import { MENU_ITEMS } from '../data/menu';
 import type { CartItem, MenuItem, PriceVariant } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
 import {
+  buildOpenInChromeIntentUrl,
   buildSceneViewerIntentUrl,
+  checkWebXRSupported,
   isAndroidDevice,
-  isMobileARCapableDevice
+  isInAppWebView,
+  isMobileARCapableDevice,
+  isSceneViewerCandidate
 } from '../utils/device';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import {
@@ -54,6 +58,7 @@ export function TableSpreadModal({
   const [arNotice, setArNotice] = useState<string | null>(null);
   const [sceneViewerFailed, setSceneViewerFailed] = useState(false);
   const [canUseWebXR, setCanUseWebXR] = useState(false);
+  const [isPresentingAR, setIsPresentingAR] = useState(false);
   const [viewMode, setViewMode] = useState<'photos' | '3d'>('photos');
 
   const totalDishes = items.reduce((sum, entry) => sum + entry.quantity, 0);
@@ -146,8 +151,16 @@ export function TableSpreadModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleFallbackHash = () => {
+    let active = true;
+    checkWebXRSupported().then((supported) => {
+      if (active) setCanUseWebXR(supported);
+    });
+
+    const handleFallbackHash = (event?: HashChangeEvent) => {
+      const hashFromUrl = event?.newURL ? new URL(event.newURL).hash : window.location.hash;
       if (
+        hashFromUrl === '#ar-fallback' ||
+        hashFromUrl === '#model-viewer-no-ar-fallback' ||
         window.location.hash === '#ar-fallback' ||
         window.location.hash === '#model-viewer-no-ar-fallback'
       ) {
@@ -158,14 +171,17 @@ export function TableSpreadModal({
         );
         setSceneViewerFailed(true);
         setArNotice(
-          'Google Scene Viewer could not launch on this device. Make sure Google App & Google Play Services for AR are installed and updated in Chrome.'
+          'Google Scene Viewer could not launch on this device (Google Play Services for AR is required). You can inspect the 3D Table above instead.'
         );
       }
     };
 
     handleFallbackHash();
     window.addEventListener('hashchange', handleFallbackHash);
-    return () => window.removeEventListener('hashchange', handleFallbackHash);
+    return () => {
+      active = false;
+      window.removeEventListener('hashchange', handleFallbackHash);
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -173,15 +189,19 @@ export function TableSpreadModal({
     if (!el || !spread) return;
 
     const updateReadiness = () => {
-      setCanUseWebXR(Boolean(el.canActivateAR));
+      if (el.canActivateAR) {
+        setCanUseWebXR(true);
+      }
     };
 
     const onArStatus = (event: Event) => {
       updateReadiness();
       const customEvent = event as CustomEvent<{ status?: string }>;
-      if (customEvent.detail?.status === 'failed') {
+      const status = customEvent.detail?.status;
+      setIsPresentingAR(status === 'session-started');
+      if (status === 'failed') {
         setArNotice(
-          'Table Spread AR session failed to start on this browser. Try tapping any single dish card for Scene Viewer AR.'
+          'Table Spread AR session could not start on this browser. Try Google Scene Viewer or inspect the 3D Table above.'
         );
       }
     };
@@ -196,8 +216,11 @@ export function TableSpreadModal({
   }, [spread]);
 
   const isAndroid = isAndroidDevice();
+  const isInWebView = isAndroid && isInAppWebView();
+  const isAndroidSceneViewerEligible = isSceneViewerCandidate();
+
   const androidSceneViewerUrl = useMemo(() => {
-    if (!isAndroid || items.length === 0) return null;
+    if (!isOpen || !isAndroid || items.length === 0) return null;
     if (totalDishes === 1) {
       const singlePath = items[0]?.item.modelGlb
         ? `${items[0].item.modelGlb}?v=10`
@@ -206,9 +229,7 @@ export function TableSpreadModal({
     }
     const spreadTitle = `Table Spread (${totalDishes} Plates)`;
     return buildSceneViewerIntentUrl(getSpreadApiGlbPath(items), spreadTitle);
-  }, [isAndroid, items, totalDishes]);
-
-  if (!isOpen) return null;
+  }, [isOpen, isAndroid, items, totalDishes]);
 
   const estimatedGuests =
     totalDishes <= 1
@@ -243,12 +264,13 @@ export function TableSpreadModal({
     }
 
     setArNotice(
-      'Table AR requires Safari on iPhone or Chrome with Google Play Services for AR on Android.'
+      'Table AR requires Safari on iPhone or Chrome with Google Play Services for AR on Android. You can preview the interactive 3D Table above.'
     );
   };
 
   return (
     <AnimatePresence>
+      {isOpen && (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -404,9 +426,14 @@ export function TableSpreadModal({
             </div>
           )}
 
-          {/* Background Model-Viewer kept solely for native 1:1 AR Table Placement */}
+          {/* Full-size AR Engine so WebXR DOMOverlay is never clipped */}
           {spread && (
-            <div className="pointer-events-none absolute h-1 w-1 overflow-hidden opacity-0" aria-hidden="true">
+            <div
+              className={`absolute inset-0 overflow-hidden transition-opacity ${
+                isPresentingAR ? 'pointer-events-auto z-30 opacity-100' : 'pointer-events-none z-0 opacity-0'
+              }`}
+              aria-hidden={!isPresentingAR}
+            >
               <model-viewer
                 key={spread.arGlbUrl}
                 ref={viewerRef}
@@ -415,9 +442,10 @@ export function TableSpreadModal({
                 alt="AR Table Spread Engine"
                 loading="eager"
                 ar
-                ar-modes="webxr quick-look"
+                ar-modes="webxr scene-viewer quick-look"
                 ar-scale="fixed"
                 ar-placement="floor"
+                className="h-full w-full"
               >
                 <span slot="ar-button" className="hidden" />
               </model-viewer>
@@ -512,61 +540,86 @@ export function TableSpreadModal({
                 </button>
               </div>
             )}
+          </div>
 
+          <div className="mt-4 flex flex-col gap-2.5">
             {arNotice && (
-              <p className="mt-2.5 rounded-xl border border-[#D96B27]/30 bg-[#D96B27]/10 px-3 py-1.5 text-[11px] text-[#F4A26E]">
+              <p className="rounded-xl border border-[#D96B27]/35 bg-[#D96B27]/12 px-3 py-2 text-[11px] leading-relaxed text-[#F4A26E]">
                 {arNotice}
               </p>
             )}
-          </div>
 
-          <div className="mt-4 flex flex-col gap-2.5 sm:flex-row lg:flex-col">
-            {isAndroid && androidSceneViewerUrl ? (
-              <a
-                href={androidSceneViewerUrl}
-                onClick={() => {
-                  setArNotice(null);
-                  setSceneViewerFailed(false);
-                }}
-                className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
-              >
-                <Box className="h-[18px] w-[18px]" />
-                Place Full Spread on Table (AR)
-              </a>
-            ) : (
+            <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
+              {isInWebView ? (
+                <a
+                  href={buildOpenInChromeIntentUrl()}
+                  className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  Open in Chrome for Table AR
+                </a>
+              ) : isAndroid && !canUseWebXR && isAndroidSceneViewerEligible && androidSceneViewerUrl ? (
+                <a
+                  href={androidSceneViewerUrl}
+                  onClick={() => {
+                    setArNotice(null);
+                    setSceneViewerFailed(false);
+                  }}
+                  className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  Place Full Spread on Table (AR)
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleActivateAR}
+                  disabled={isMobileARCapableDevice() && (!spread || isBuilding)}
+                  className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+                >
+                  <Box className="h-[18px] w-[18px]" />
+                  Place Full Spread on Table (AR)
+                </button>
+              )}
+
+              {isAndroid && arNotice && canUseWebXR && isAndroidSceneViewerEligible && androidSceneViewerUrl && (
+                <a
+                  href={androidSceneViewerUrl}
+                  onClick={() => {
+                    setArNotice(null);
+                    setSceneViewerFailed(false);
+                  }}
+                  className="liquid-glass-pill flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/50 px-4 text-xs font-semibold text-[#F4A26E] transition hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Box className="h-4 w-4" />
+                  Try Google Scene Viewer (AR)
+                </a>
+              )}
+
+              {isAndroid && sceneViewerFailed && viewMode !== '3d' && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('3d')}
+                  className="liquid-glass-pill flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/50 px-4 text-xs font-semibold text-[#F4A26E] transition hover:brightness-110 active:scale-[0.98]"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Inspect 3D Table Preview
+                </button>
+              )}
+
               <button
                 type="button"
-                onClick={handleActivateAR}
-                disabled={isMobileARCapableDevice() && (!spread || isBuilding)}
-                className="liquid-glass-saffron flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/25 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+                onClick={onProceedToOrder}
+                className="liquid-glass-pill flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110 active:scale-[0.98]"
               >
-                <Box className="h-[18px] w-[18px]" />
-                Place Full Spread on Table (AR)
+                <span>Proceed to Order</span>
+                <ArrowRight className="h-4 w-4 text-[#F4A26E]" />
               </button>
-            )}
-
-            {isAndroid && sceneViewerFailed && canUseWebXR && (
-              <button
-                type="button"
-                onClick={handleActivateAR}
-                className="liquid-glass-pill flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-2xl border border-[#D96B27]/50 px-4 text-xs font-semibold text-[#F4A26E] transition hover:brightness-110 active:scale-[0.98]"
-              >
-                <Box className="h-4 w-4" />
-                Try In-Browser WebXR AR
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onProceedToOrder}
-              className="liquid-glass-pill flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl border border-white/15 px-4 text-sm font-semibold text-[#F7F3EC] transition hover:border-white/25 hover:brightness-110 active:scale-[0.98]"
-            >
-              <span>Proceed to Order</span>
-              <ArrowRight className="h-4 w-4 text-[#F4A26E]" />
-            </button>
+            </div>
           </div>
         </div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

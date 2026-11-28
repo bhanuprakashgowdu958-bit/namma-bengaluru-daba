@@ -10,6 +10,14 @@
   },
   "headers": [
     {
+      "source": "/api/spread/(.*)\\.glb",
+      "headers": [
+        { "key": "Content-Type", "value": "model/gltf-binary" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
+      ]
+    },
+    {
       "source": "/api/spread.glb",
       "headers": [
         { "key": "Content-Type", "value": "model/gltf-binary" },
@@ -53,6 +61,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/spread/:models.glb",
+      "destination": "/api/spread?models=:models"
+    },
     {
       "source": "/api/spread.glb",
       "destination": "/api/spread"

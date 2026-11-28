@@ -12,8 +12,10 @@ import type { MenuItem } from '../types/menu';
 import type { ModelViewerElement } from '../types/model-viewer';
 import {
   buildSceneViewerIntentUrl,
+  checkWebXRSupported,
   isAndroidDevice,
-  isIOSDevice
+  isIOSDevice,
+  isSceneViewerCandidate
 } from '../utils/device';
 import { DietaryBadge } from './DietaryBadge';
 
@@ -52,6 +54,18 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     const [hasError, setHasError] = useState(false);
     const [showGestureHint, setShowGestureHint] = useState(false);
     const [showHotspotCard, setShowHotspotCard] = useState(false);
+    const [isWebXRSupported, setIsWebXRSupported] = useState(false);
+    const [isPresentingAR, setIsPresentingAR] = useState(false);
+
+    useEffect(() => {
+      let active = true;
+      checkWebXRSupported().then((supported) => {
+        if (active) setIsWebXRSupported(supported);
+      });
+      return () => {
+        active = false;
+      };
+    }, []);
 
     const hasAR = Boolean(item.hasAR && item.modelGlb);
     const hasInteractive3D = Boolean(hasAR && item.hasCustom3DScan);
@@ -77,14 +91,17 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     }, [item.id, hasInteractive3D]);
 
     useEffect(() => {
-      const handleFallbackHash = () => {
+      const handleFallbackHash = (event?: HashChangeEvent) => {
+        const hashFromUrl = event?.newURL ? new URL(event.newURL).hash : window.location.hash;
         if (
+          hashFromUrl === '#model-viewer-no-ar-fallback' ||
+          hashFromUrl === '#ar-fallback' ||
           window.location.hash === '#model-viewer-no-ar-fallback' ||
           window.location.hash === '#ar-fallback'
         ) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search);
           onARFailedRef.current?.(
-            'Scene Viewer could not load this dish model. Make sure Google Play Services for AR is updated and the site is publicly accessible without login protection.'
+            'Google Scene Viewer could not launch on this device. Make sure Google App & Google Play Services for AR are installed and updated in Chrome.'
           );
         }
       };
@@ -95,7 +112,9 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
       const el = viewerRef.current;
       const handleArStatus = (event: Event) => {
         const customEvent = event as CustomEvent<{ status?: string }>;
-        if (customEvent.detail?.status === 'failed') {
+        const status = customEvent.detail?.status;
+        setIsPresentingAR(status === 'session-started');
+        if (status === 'failed') {
           onARFailedRef.current?.(
             'AR session could not start on this device. Open this menu on Safari (iOS) or Chrome (Android) for live table AR.'
           );
@@ -168,29 +187,37 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           return false;
         }
 
-        // ── ANDROID: Always launch Scene Viewer directly ──
-        // Bypass model-viewer's el.activateAR() entirely on Android because:
-        // 1) $selectARMode() is async and may not have resolved (canActivateAR = false)
-        // 2) model-viewer's $openSceneViewer uses an internal $arAnchor that may
-        //    silently fail or expire the user-gesture token
-        // Scene Viewer downloads the GLB independently, so no local model load needed.
+        // Prefer in-browser WebXR on Android Chrome when supported, else Scene Viewer
         if (isAndroidDevice()) {
-          try {
-            const intentUrl = buildSceneViewerIntentUrl(modelGlbSrc, item.name);
-            const anchor = document.createElement('a');
-            anchor.setAttribute('href', intentUrl);
-            anchor.style.display = 'none';
-            document.body.appendChild(anchor);
-            anchor.click();
-            // Clean up after a tick
-            window.setTimeout(() => anchor.remove(), 100);
-            return true;
-          } catch {
-            onARUnsupported?.(
-              'Could not launch AR. Make sure Google Play Services for AR is installed and updated.'
-            );
-            return false;
+          if (isWebXRSupported && el.canActivateAR) {
+            try {
+              await el.activateAR();
+              return true;
+            } catch {
+              // Fall back to Scene Viewer below
+            }
           }
+          if (isSceneViewerCandidate()) {
+            try {
+              const intentUrl = buildSceneViewerIntentUrl(modelGlbSrc, item.name);
+              const anchor = document.createElement('a');
+              anchor.setAttribute('href', intentUrl);
+              anchor.style.display = 'none';
+              document.body.appendChild(anchor);
+              anchor.click();
+              window.setTimeout(() => anchor.remove(), 100);
+              return true;
+            } catch {
+              onARUnsupported?.(
+                'Could not launch AR. Make sure Google Play Services for AR is installed and updated.'
+              );
+              return false;
+            }
+          }
+          onARUnsupported?.(
+            'Open this menu in Google Chrome on Android with Google Play Services for AR to place dishes on your table.'
+          );
+          return false;
         }
 
         // ── iOS: Use model-viewer's activateAR for USDZ auto-generation ──
@@ -319,9 +346,14 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           </motion.div>
         </AnimatePresence>
 
-        {/* Hidden model-viewer outside Iris animation solely for AR activation on photo-stage dishes */}
+        {/* Full-size AR model-viewer outside Iris animation so WebXR DOMOverlay is never clipped */}
         {hasAR && !hasInteractive3D && (
-          <div className="pointer-events-none absolute h-1 w-1 overflow-hidden opacity-0" aria-hidden="true">
+          <div
+            className={`absolute inset-0 overflow-hidden transition-opacity ${
+              isPresentingAR ? 'pointer-events-auto z-30 opacity-100' : 'pointer-events-none z-0 opacity-0'
+            }`}
+            aria-hidden={!isPresentingAR}
+          >
             <model-viewer
               key={`ar-engine-${item.id}`}
               ref={viewerRef}
@@ -329,11 +361,12 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
               ios-src={modelUsdzSrc}
               alt={`${item.name} AR engine`}
               ar
-              ar-modes="scene-viewer webxr quick-look"
+              ar-modes="webxr scene-viewer quick-look"
               ar-scale="fixed"
               ar-placement="floor"
               reveal="manual"
-              loading="lazy"
+              loading="eager"
+              className="h-full w-full"
             >
               <span slot="ar-button" className="hidden" aria-hidden="true" />
             </model-viewer>

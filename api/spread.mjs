@@ -309,9 +309,14 @@ export default async function handler(req, res) {
 
   try {
     const reqUrl = new URL(req.url || '/', `https://${req.headers.host || 'localhost'}`);
-    const modelsParam = reqUrl.searchParams.get('models') || '';
+    let modelsParam = reqUrl.searchParams.get('models') || '';
+    if (!modelsParam && reqUrl.pathname.startsWith('/api/spread/')) {
+      modelsParam = reqUrl.pathname
+        .slice('/api/spread/'.length)
+        .replace(/\.glb$/i, '');
+    }
     const rawSlugs = modelsParam
-      .split(',')
+      .split(/[,]|--/)
       .map((s) => s.trim().toLowerCase())
       .filter((s) => /^[a-z0-9-]+$/.test(s))
       .slice(0, MAX_PLATES);

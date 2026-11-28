@@ -45,6 +45,18 @@ export default function App() {
   const [isTrayOpen, setIsTrayOpen] = useState(false);
   const [isSpreadOpen, setIsSpreadOpen] = useState(false);
   const [tableNumber, setTableNumber] = useState('');
+  const [isDesktopViewport, setIsDesktopViewport] = useState<boolean>(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktopViewport(mql.matches);
+    update();
+    mql.addEventListener('change', update);
+    return () => mql.removeEventListener('change', update);
+  }, []);
   const [showMenuCover, setShowMenuCover] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     const params = new URLSearchParams(window.location.search);
@@ -284,8 +296,9 @@ export default function App() {
 
       {/* Responsive Shell: Mobile single column | Desktop >=1024px Editorial 55/45 Split-Screen */}
       <div className="relative z-10 mx-auto flex max-w-[1600px] flex-col lg:flex-row">
-        {/* LEFT (55% on Desktop >=1024px): Sticky Architectural 3D & AR Gallery Studio */}
-        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[55%] lg:flex-col lg:justify-between lg:border-r lg:border-white/10 lg:bg-transparent lg:p-6">
+        {/* LEFT (55% on Desktop >=1024px): Only mounted on desktop so mobile #ar-fallback isn't intercepted */}
+        {isDesktopViewport && (
+          <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[55%] lg:flex-col lg:justify-between lg:border-r lg:border-white/10 lg:bg-transparent lg:p-6">
           {/* Detached Top Gallery Frame + Floating Dish Switcher */}
           <div className="relative flex flex-1 flex-col overflow-hidden rounded-[32px] border border-white/15 bg-[#0A0A0D] shadow-[0_32px_80px_-16px_rgba(0,0,0,0.92)]">
             <ModelViewerStage
@@ -446,6 +459,7 @@ export default function App() {
             </div>
           </div>
         </aside>
+        )}
 
         {/* RIGHT (45% on Desktop, 100% on Mobile): Menu Catalog */}
         <main className="mx-auto w-full max-w-lg overflow-x-clip lg:mx-0 lg:w-[45%] lg:max-w-none">
@@ -473,6 +487,7 @@ export default function App() {
         item={mobileModalItem}
         onClose={() => setMobileModalItem(null)}
         onAddToTray={addToTray}
+        onFallbackDesktopQR={(fallbackItem) => setQrModalItem(fallbackItem)}
       />
 
       {/* Floating Table Tray Bar & Order Handoff Drawer */}
