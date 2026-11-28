@@ -242,23 +242,66 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
         <AnimatePresence mode="popLayout">
           <motion.div
             key={item.id}
-            initial={{ opacity: 0.35, scale: 1.08, clipPath: 'circle(0% at 50% 50%)' }}
-            animate={{ opacity: 1, scale: 1, clipPath: 'circle(150% at 50% 50%)' }}
-            exit={{ opacity: 0, scale: 0.96, clipPath: 'circle(0% at 50% 50%)' }}
-            transition={{ duration: 0.48, ease: [0.22, 1, 0.36, 1] }}
-            className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden"
+            initial={{ opacity: 0.7, scale: 1.05, clipPath: 'circle(8% at 50% 50%)' }}
+            animate={{ opacity: 1, scale: 1, clipPath: 'circle(145% at 50% 50%)' }}
+            exit={{ opacity: 0, scale: 0.97, clipPath: 'circle(0% at 50% 50%)' }}
+            transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 h-full w-full overflow-hidden"
           >
             {/* Expanding Saffron Spotlight Iris Ring */}
             <motion.div
               aria-hidden="true"
-              initial={{ scale: 0.15, opacity: 0.9 }}
-              animate={{ scale: 1.9, opacity: 0 }}
-              transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
-              className="pointer-events-none absolute z-20 h-64 w-64 rounded-full border-2 border-[#F4A26E]/65 shadow-[0_0_48px_rgba(217,107,39,0.55)]"
+              initial={{ scale: 0.18, opacity: 0.85 }}
+              animate={{ scale: 2.1, opacity: 0 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none absolute inset-0 z-20 m-auto h-56 w-56 rounded-full border-2 border-[#F4A26E]/65 shadow-[0_0_48px_rgba(217,107,39,0.55)]"
             />
 
-            {/* Direct zero-flash Studio Food Photo for instant 60fps Iris reveal */}
-            {hasAR && item.poster && !hasInteractive3D && (
+            {hasInteractive3D && hasAR ? (
+              <model-viewer
+                ref={viewerRef}
+                src={modelGlbSrc}
+                ios-src={modelUsdzSrc}
+                poster={item.poster}
+                alt={`${item.name} studio dish preview`}
+                ar
+                ar-modes="scene-viewer webxr quick-look"
+                ar-scale="fixed"
+                ar-placement="floor"
+                reveal="auto"
+                camera-controls
+                shadow-intensity="1.2"
+                shadow-softness="0.85"
+                exposure="1.0"
+                environment-image="neutral"
+                camera-orbit={DEFAULT_ORBIT}
+                field-of-view="24deg"
+                min-camera-orbit="auto 16deg 55%"
+                max-camera-orbit="auto 80deg 115%"
+                interaction-prompt="none"
+                touch-action="pan-y"
+                loading="eager"
+                className="relative z-10 h-full w-full"
+              >
+                {item.poster && (
+                  <div
+                    slot="poster"
+                    className="relative h-full w-full overflow-hidden bg-[#08080A]"
+                  >
+                    <img
+                      src={item.poster}
+                      alt={item.name}
+                      className="h-full w-full object-cover object-center"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
+                    />
+                  </div>
+                )}
+                <span slot="ar-button" className="hidden" aria-hidden="true" />
+              </model-viewer>
+            ) : hasAR && item.poster ? (
               <div className="relative z-10 h-full w-full overflow-hidden bg-[#08080A]">
                 <img
                   src={item.poster}
@@ -272,44 +315,30 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
                   className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
                 />
               </div>
-            )}
-
-            {/* Keep model-viewer mounted for 3D scans & iOS Quick Look / WebXR AR */}
-            {hasAR ? (
-              <model-viewer
-                ref={viewerRef}
-                src={modelGlbSrc}
-                ios-src={modelUsdzSrc}
-                poster={item.poster}
-                alt={`${item.name} studio dish preview`}
-                ar
-                ar-modes="scene-viewer webxr quick-look"
-                ar-scale="fixed"
-                ar-placement="floor"
-                reveal={hasInteractive3D ? 'auto' : 'manual'}
-                camera-controls
-                shadow-intensity="1.2"
-                shadow-softness="0.85"
-                exposure="1.0"
-                environment-image="neutral"
-                camera-orbit={DEFAULT_ORBIT}
-                field-of-view="24deg"
-                min-camera-orbit="auto 16deg 55%"
-                max-camera-orbit="auto 80deg 115%"
-                interaction-prompt="none"
-                touch-action="pan-y"
-                loading={hasInteractive3D ? 'eager' : 'lazy'}
-                className={
-                  hasInteractive3D
-                    ? 'relative z-10 h-full w-full'
-                    : 'pointer-events-none absolute inset-0 z-0 h-full w-full opacity-0'
-                }
-              >
-                <span slot="ar-button" className="hidden" aria-hidden="true" />
-              </model-viewer>
             ) : null}
           </motion.div>
         </AnimatePresence>
+
+        {/* Hidden model-viewer outside Iris animation solely for AR activation on photo-stage dishes */}
+        {hasAR && !hasInteractive3D && (
+          <div className="pointer-events-none absolute h-1 w-1 overflow-hidden opacity-0" aria-hidden="true">
+            <model-viewer
+              key={`ar-engine-${item.id}`}
+              ref={viewerRef}
+              src={modelGlbSrc}
+              ios-src={modelUsdzSrc}
+              alt={`${item.name} AR engine`}
+              ar
+              ar-modes="scene-viewer webxr quick-look"
+              ar-scale="fixed"
+              ar-placement="floor"
+              reveal="manual"
+              loading="lazy"
+            >
+              <span slot="ar-button" className="hidden" aria-hidden="true" />
+            </model-viewer>
+          </div>
+        )}
 
         {/* Minimalist Spatial AR Viewfinder Corner Brackets */}
         {hasAR && (
