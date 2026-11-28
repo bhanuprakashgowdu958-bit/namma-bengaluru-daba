@@ -70,7 +70,6 @@ function createReticleMesh(): THREE.Group {
 function buildOverlayElement(
   title: string,
   callbacks: {
-    onPlaceOrMove: () => void;
     onRotate: (deltaRad: number) => void;
     onExit: () => void;
   }
@@ -116,43 +115,31 @@ function buildOverlayElement(
   const hintPill = document.createElement('div');
   hintPill.style.cssText =
     'background:rgba(14,14,17,0.82);backdrop-filter:blur(16px);border:1px solid rgba(217,107,39,0.45);border-radius:999px;padding:8px 16px;font-size:12px;font-weight:500;color:#F7F3EC;text-align:center;';
-  hintPill.textContent = 'Point at any flat surface…';
+  hintPill.textContent = 'Detecting flat surface…';
 
   const controlsRow = document.createElement('div');
   controlsRow.style.cssText =
-    'pointer-events:auto;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;';
+    'pointer-events:auto;display:none;align-items:center;justify-content:center;gap:10px;';
   blockXRSelect(controlsRow);
 
   const rotateLeftBtn = document.createElement('button');
   rotateLeftBtn.type = 'button';
   rotateLeftBtn.textContent = '↺';
-  rotateLeftBtn.setAttribute('aria-label', 'Rotate left');
+  rotateLeftBtn.setAttribute('aria-label', 'Rotate dish left');
   rotateLeftBtn.style.cssText =
-    'display:none;width:46px;height:46px;border-radius:16px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);color:#F7F3EC;font-size:18px;cursor:pointer;';
+    'width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);backdrop-filter:blur(14px);color:#F7F3EC;font-size:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;';
   blockXRSelect(rotateLeftBtn);
   rotateLeftBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     callbacks.onRotate(-Math.PI / 8);
   });
 
-  const actionBtn = document.createElement('button');
-  actionBtn.type = 'button';
-  actionBtn.textContent = 'Detecting Surface…';
-  actionBtn.disabled = true;
-  actionBtn.style.cssText =
-    'flex:1;min-height:48px;border-radius:16px;border:1px solid rgba(255,255,255,0.28);background:linear-gradient(135deg,#F28038,#D9621C);color:#F7F3EC;font-size:14px;font-weight:600;padding:0 18px;cursor:pointer;opacity:0.7;box-shadow:0 12px 28px -6px rgba(217,107,39,0.55);';
-  blockXRSelect(actionBtn);
-  actionBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    callbacks.onPlaceOrMove();
-  });
-
   const rotateRightBtn = document.createElement('button');
   rotateRightBtn.type = 'button';
   rotateRightBtn.textContent = '↻';
-  rotateRightBtn.setAttribute('aria-label', 'Rotate right');
+  rotateRightBtn.setAttribute('aria-label', 'Rotate dish right');
   rotateRightBtn.style.cssText =
-    'display:none;width:46px;height:46px;border-radius:16px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);color:#F7F3EC;font-size:18px;cursor:pointer;';
+    'width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);backdrop-filter:blur(14px);color:#F7F3EC;font-size:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;';
   blockXRSelect(rotateRightBtn);
   rotateRightBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -160,7 +147,6 @@ function buildOverlayElement(
   });
 
   controlsRow.appendChild(rotateLeftBtn);
-  controlsRow.appendChild(actionBtn);
   controlsRow.appendChild(rotateRightBtn);
 
   bottomPanel.appendChild(hintPill);
@@ -170,49 +156,23 @@ function buildOverlayElement(
 
   return {
     overlay,
-    setUIState: (state: 'scanning' | 'ready' | 'placed', customHint?: string) => {
+    setUIState: (state: 'scanning' | 'placed', customHint?: string) => {
       if (state === 'scanning') {
-        hintPill.textContent = customHint ?? 'Point at any flat surface…';
-        actionBtn.textContent = 'Place on Surface';
-        actionBtn.disabled = false;
-        actionBtn.style.opacity = '0.9';
-        actionBtn.style.background = 'linear-gradient(135deg,#F28038,#D9621C)';
-        rotateLeftBtn.style.display = 'none';
-        rotateRightBtn.style.display = 'none';
-      } else if (state === 'ready') {
-        hintPill.textContent = customHint ?? 'Aim at any flat spot — tap to lock dish';
-        actionBtn.textContent = 'Lock on Surface';
-        actionBtn.disabled = false;
-        actionBtn.style.opacity = '1';
-        actionBtn.style.background = 'linear-gradient(135deg,#F28038,#D9621C)';
-        rotateLeftBtn.style.display = 'inline-flex';
-        rotateLeftBtn.style.alignItems = 'center';
-        rotateLeftBtn.style.justifyContent = 'center';
-        rotateRightBtn.style.display = 'inline-flex';
-        rotateRightBtn.style.alignItems = 'center';
-        rotateRightBtn.style.justifyContent = 'center';
+        hintPill.textContent = customHint ?? 'Detecting flat surface…';
+        controlsRow.style.display = 'none';
       } else {
         hintPill.textContent = customHint ?? 'Locked on surface (1:1 scale) • Walk around freely';
-        actionBtn.textContent = 'Move Dish';
-        actionBtn.disabled = false;
-        actionBtn.style.opacity = '1';
-        actionBtn.style.background = 'rgba(14,14,17,0.86)';
-        rotateLeftBtn.style.display = 'inline-flex';
-        rotateLeftBtn.style.alignItems = 'center';
-        rotateLeftBtn.style.justifyContent = 'center';
-        rotateRightBtn.style.display = 'inline-flex';
-        rotateRightBtn.style.alignItems = 'center';
-        rotateRightBtn.style.justifyContent = 'center';
+        controlsRow.style.display = 'flex';
       }
     }
   };
 }
 
 /**
- * Launches a hardware-anchored WebXR Table AR session for Android Chrome.
- * Uses multi-entity (`plane` + `point`) hit-testing and downward fallback rays so any flat surface
- * (wooden tables, patterned cloths, desks, countertops) displays the dish promptly, then locks the
- * dish with a hardware `XRAnchor` + micro-jitter deadband and gravity alignment for 100% stability.
+ * Launches an automatically hardware-anchored WebXR Table AR session for Android Chrome.
+ * Detects flat surfaces via `plane` + `point` hit-testing and downward fallback rays, then
+ * automatically locks the dish onto the surface with an `XRAnchor` + micro-jitter deadband and
+ * gravity alignment so it stays planted cleanly without a Move Dish unlock loop.
  */
 export async function startAnchoredTableAR(
   options: StartAnchoredTableAROptions
@@ -239,25 +199,13 @@ export async function startAnchoredTableAR(
   let overlayHandle: ReturnType<typeof buildOverlayElement> | null = null;
   let ended = false;
 
-  // State machine:
-  // - On session start (`autoPlacePending = true`), automatically places & hardware-locks the dish
-  //   on the first detected flat surface so the user immediately sees it on their table/surface.
-  // - Tapping "Move Dish" unlocks (`isPlaced = false`, `autoPlacePending = false`) and glides the
-  //   live dish + reticle across flat surfaces until user taps "Lock on Surface" or taps screen.
   let isPlaced = false;
-  let autoPlacePending = true;
-  let pendingManualPlace = false;
-  let hasSurfacePose = false;
+  let needsSurfaceAnchorUpgrade = false;
+  let fallbackPlacedAt = 0;
   let anchorStabilized = false;
   let userYaw = 0;
 
-  const smoothedSurfacePos = new THREE.Vector3();
-  let surfaceInitialized = false;
-
-  const cleanup = async () => {
-    if (ended) return;
-    ended = true;
-
+  const cancelHitTestSources = () => {
     try {
       centerHitTestSource?.cancel();
     } catch {
@@ -271,6 +219,13 @@ export async function startAnchoredTableAR(
       // Ignore
     }
     angledHitTestSource = null;
+  };
+
+  const cleanup = async () => {
+    if (ended) return;
+    ended = true;
+
+    cancelHitTestSources();
 
     try {
       placedAnchor?.delete?.();
@@ -312,26 +267,6 @@ export async function startAnchoredTableAR(
     });
 
     overlayHandle = buildOverlayElement(title, {
-      onPlaceOrMove: () => {
-        if (isPlaced) {
-          // Unlock anchor so user can glide the dish smoothly onto another spot/surface
-          try {
-            placedAnchor?.delete?.();
-          } catch {
-            // Ignore
-          }
-          placedAnchor = null;
-          isPlaced = false;
-          autoPlacePending = false;
-          pendingManualPlace = false;
-          anchorStabilized = false;
-          surfaceInitialized = false;
-          overlayHandle?.setUIState(hasSurfacePose ? 'ready' : 'scanning');
-          onStatusChange?.(hasSurfacePose ? 'ready' : 'scanning');
-        } else {
-          pendingManualPlace = true;
-        }
-      },
       onRotate: (deltaRad) => {
         userYaw += deltaRad;
         dishContent.rotation.y = userYaw;
@@ -353,13 +288,6 @@ export async function startAnchoredTableAR(
 
     session.addEventListener('end', () => {
       void cleanup();
-    });
-
-    // Tapping anywhere on the AR camera feed while in Move/Aim mode locks the dish onto that surface
-    session.addEventListener('select', () => {
-      if (!isPlaced) {
-        pendingManualPlace = true;
-      }
     });
 
     renderer = new THREE.WebGLRenderer({
@@ -446,8 +374,6 @@ export async function startAnchoredTableAR(
 
     const viewerSpace = await session.requestReferenceSpace('viewer');
 
-    // Request BOTH 'plane' AND 'point' hit-tests so textured cloths, sheets, smooth tables,
-    // marble counters, and desks all respond immediately without waiting for slow plane merging.
     const requestHitSource = async (
       ray?: XRRay
     ): Promise<XRHitTestSource | null> => {
@@ -464,7 +390,7 @@ export async function startAnchoredTableAR(
         ).requestHitTestSource?.(initWithEntities);
         if (src) return src;
       } catch {
-        // Browser may not support entityTypes; fall back to standard requestHitTestSource
+        // Fallback when entityTypes isn't accepted
       }
 
       try {
@@ -484,7 +410,6 @@ export async function startAnchoredTableAR(
 
     centerHitTestSource = await requestHitSource();
 
-    // Downward ~20-degree probe ray catches tabletop surfaces even when user holds phone comfortably upright
     if (typeof XRRay === 'function' && typeof DOMPoint === 'function') {
       const downwardRay = new XRRay(new DOMPoint(0, 0, 0), {
         x: 0,
@@ -495,7 +420,6 @@ export async function startAnchoredTableAR(
     }
 
     const tempMatrix = new THREE.Matrix4();
-    const tempPos = new THREE.Vector3();
     const camPos = new THREE.Vector3();
     const camDir = new THREE.Vector3();
     const anchorPos = new THREE.Vector3();
@@ -509,9 +433,8 @@ export async function startAnchoredTableAR(
     const pickFlatSurfaceHit = (
       results: readonly XRHitTestResult[],
       cameraPosition: THREE.Vector3
-    ): { hit: XRHitTestResult; pos: THREE.Vector3; isPlaneLike: boolean } | null => {
-      let fallbackPoint: { hit: XRHitTestResult; pos: THREE.Vector3; isPlaneLike: boolean } | null =
-        null;
+    ): { hit: XRHitTestResult; pos: THREE.Vector3 } | null => {
+      let fallbackPoint: { hit: XRHitTestResult; pos: THREE.Vector3 } | null = null;
 
       for (const res of results) {
         const pose = res.getPose(referenceSpace);
@@ -522,22 +445,60 @@ export async function startAnchoredTableAR(
         const dist = pos.distanceTo(cameraPosition);
         if (dist < 0.18 || dist > 3.2) continue;
 
-        // matrix[5] is local +Y surface normal along world +Y (gravity up)
         if (pose.transform.matrix[5] > 0.55) {
-          return { hit: res, pos, isPlaneLike: true };
+          return { hit: res, pos };
         }
 
-        // For sparse 'point' hits whose pose orientation isn't gravity-aligned,
-        // accept hits that clearly lie below the camera (table/desk/floor/bedsheet).
         if (!fallbackPoint && pos.y < cameraPosition.y - 0.04) {
-          fallbackPoint = { hit: res, pos, isPlaneLike: false };
+          fallbackPoint = { hit: res, pos };
         }
       }
 
       return fallbackPoint;
     };
 
-    const lockAtPosition = (targetPos: THREE.Vector3, hitToAnchor: XRHitTestResult | null) => {
+    const queryBestSurfaceHit = (frame: XRFrame) => {
+      if (centerHitTestSource) {
+        const centerHit = pickFlatSurfaceHit(frame.getHitTestResults(centerHitTestSource), camPos);
+        if (centerHit) return centerHit;
+      }
+      if (angledHitTestSource) {
+        return pickFlatSurfaceHit(frame.getHitTestResults(angledHitTestSource), camPos);
+      }
+      return null;
+    };
+
+    const attachAnchorFromHit = (hitToAnchor: XRHitTestResult) => {
+      if (typeof hitToAnchor.createAnchor !== 'function' || creatingAnchor) {
+        cancelHitTestSources();
+        return;
+      }
+      creatingAnchor = true;
+      hitToAnchor
+        .createAnchor()
+        .then((anchor) => {
+          if (ended || !isPlaced) {
+            anchor.delete?.();
+          } else {
+            placedAnchor?.delete?.();
+            placedAnchor = anchor;
+            anchorStabilized = false;
+          }
+          cancelHitTestSources();
+        })
+        .catch(() => {
+          cancelHitTestSources();
+        })
+        .finally(() => {
+          creatingAnchor = false;
+        });
+    };
+
+    const lockAtPosition = (
+      targetPos: THREE.Vector3,
+      hitToAnchor: XRHitTestResult | null,
+      nowMs: number
+    ) => {
       if (!yawInitialized) {
         userYaw = Math.atan2(camPos.x - targetPos.x, camPos.z - targetPos.z);
         dishContent.rotation.y = userYaw;
@@ -549,30 +510,17 @@ export async function startAnchoredTableAR(
       dishRoot.visible = true;
       reticle.visible = false;
       isPlaced = true;
-      autoPlacePending = false;
-      pendingManualPlace = false;
       anchorStabilized = false;
 
       overlayHandle?.setUIState('placed');
       onStatusChange?.('placed');
 
-      if (hitToAnchor && typeof hitToAnchor.createAnchor === 'function' && !creatingAnchor) {
-        creatingAnchor = true;
-        hitToAnchor
-          .createAnchor()
-          .then((anchor) => {
-            if (ended || !isPlaced) {
-              anchor.delete?.();
-            } else {
-              placedAnchor = anchor;
-            }
-          })
-          .catch(() => {
-            // Static local-floor/local world coordinate fallback still remains level & anchored
-          })
-          .finally(() => {
-            creatingAnchor = false;
-          });
+      if (hitToAnchor) {
+        needsSurfaceAnchorUpgrade = false;
+        attachAnchorFromHit(hitToAnchor);
+      } else {
+        needsSurfaceAnchorUpgrade = true;
+        fallbackPlacedAt = nowMs;
       }
     };
 
@@ -591,8 +539,23 @@ export async function startAnchoredTableAR(
         xrCam.getWorldDirection(camDir);
       }
 
-      // 1. LOCKED MODE: Update dish from hardware XRAnchor with micro-jitter deadband & strict level lock
+      // 1. LOCKED MODE: Dish is automatically locked; track XRAnchor with zero micro-jitter
       if (isPlaced) {
+        // If placed via initial 650ms fallback, silently upgrade height & XRAnchor once on first real hit
+        if (needsSurfaceAnchorUpgrade && !placedAnchor && !creatingAnchor) {
+          if (time - fallbackPlacedAt > 2500) {
+            needsSurfaceAnchorUpgrade = false;
+            cancelHitTestSources();
+          } else {
+            const upgradeHit = queryBestSurfaceHit(frame);
+            if (upgradeHit) {
+              needsSurfaceAnchorUpgrade = false;
+              dishRoot.position.y = upgradeHit.pos.y;
+              attachAnchorFromHit(upgradeHit.hit);
+            }
+          }
+        }
+
         if (placedAnchor) {
           const anchorPose = frame.getPose(placedAnchor.anchorSpace, referenceSpace);
           if (anchorPose) {
@@ -605,16 +568,14 @@ export async function startAnchoredTableAR(
             } else {
               const drift = dishRoot.position.distanceTo(anchorPos);
               if (drift >= 0.06) {
-                // Large SLAM relocalization correction: converge smoothly without popping
                 dishRoot.position.lerp(anchorPos, 0.45);
               } else if (drift >= 0.003) {
-                // Subtle SLAM refinement: smooth blend
                 dishRoot.position.lerp(anchorPos, 0.2);
               }
-              // < 3mm sub-millimeter tracking noise: ignore completely for 100% frozen stability
             }
           }
         }
+
         // Strictly gravity-leveled plates at all times (zero tilt jitter)
         dishRoot.quaternion.set(0, 0, 0, 1);
         dishRoot.visible = modelReady;
@@ -624,78 +585,29 @@ export async function startAnchoredTableAR(
         return;
       }
 
-      // 2. SCANNING / AIMING MODE: Query center hit-test, then downward-angled probe
-      let bestHit: { hit: XRHitTestResult; pos: THREE.Vector3; isPlaneLike: boolean } | null = null;
-
-      if (centerHitTestSource) {
-        const centerResults = frame.getHitTestResults(centerHitTestSource);
-        bestHit = pickFlatSurfaceHit(centerResults, camPos);
-      }
-
-      if (!bestHit && angledHitTestSource) {
-        const angledResults = frame.getHitTestResults(angledHitTestSource);
-        bestHit = pickFlatSurfaceHit(angledResults, camPos);
-      }
+      // 2. INITIAL AUTO-LOCK: Query flat surface hits and lock automatically once ready
+      const bestHit = queryBestSurfaceHit(frame);
 
       if (bestHit) {
-        tempPos.copy(bestHit.pos);
-
-        if (!surfaceInitialized) {
-          smoothedSurfacePos.copy(tempPos);
-          surfaceInitialized = true;
-        } else {
-          const jump = smoothedSurfacePos.distanceTo(tempPos);
-          smoothedSurfacePos.lerp(tempPos, jump > 0.25 ? 0.5 : 0.28);
-        }
-
-        reticle.position.copy(smoothedSurfacePos);
-        reticle.visible = true;
-
-        if (!hasSurfacePose) {
-          hasSurfacePose = true;
-        }
+        reticle.position.copy(bestHit.pos);
+        reticle.visible = !modelReady;
 
         if (modelReady) {
-          if (autoPlacePending || pendingManualPlace) {
-            lockAtPosition(smoothedSurfacePos, bestHit.hit);
-          } else {
-            // In "Move Dish" aiming mode: glide the actual dish smoothly on the flat surface
-            if (!yawInitialized) {
-              userYaw = Math.atan2(
-                camPos.x - smoothedSurfacePos.x,
-                camPos.z - smoothedSurfacePos.z
-              );
-              dishContent.rotation.y = userYaw;
-              yawInitialized = true;
-            }
-            dishRoot.position.copy(smoothedSurfacePos);
-            dishRoot.quaternion.set(0, 0, 0, 1);
-            dishRoot.visible = true;
-            overlayHandle?.setUIState('ready');
-            onStatusChange?.('ready');
-          }
+          lockAtPosition(bestHit.pos, bestHit.hit, time);
         } else {
-          overlayHandle?.setUIState('scanning', 'Surface found — loading 1:1 dish model…');
+          overlayHandle?.setUIState('scanning', 'Surface found — locking 1:1 dish…');
         }
       } else {
-        // Fallback when user taps Place manually (or on dark/featureless surfaces) so it NEVER stalls
         const elapsedMs = time - (firstFrameTime ?? time);
-        if (pendingManualPlace && modelReady) {
+        if (modelReady && elapsedMs >= 650) {
+          // Automatic placement fallback so AR always displays & locks immediately
           const horizLen = Math.hypot(camDir.x, camDir.z) || 1;
           const fallbackPos = new THREE.Vector3(
             camPos.x + (camDir.x / horizLen) * 0.65,
-            camPos.y - 0.42,
+            camPos.y - 0.4,
             camPos.z + (camDir.z / horizLen) * 0.65
           );
-          lockAtPosition(fallbackPos, null);
-        } else if (surfaceInitialized && modelReady) {
-          // Keep dish steady at last known flat surface instead of flickering
-          dishRoot.visible = true;
-        } else if (elapsedMs > 1200 && !hasSurfacePose) {
-          overlayHandle?.setUIState(
-            'scanning',
-            'Tap "Place on Surface" anytime or point at flat surface'
-          );
+          lockAtPosition(fallbackPos, null, time);
         } else {
           reticle.visible = false;
         }
