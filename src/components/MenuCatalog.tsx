@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { BookOpen, Box, ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
 import { formatINR, getDefaultVariant } from '../utils/format';
@@ -53,25 +52,17 @@ export function MenuCatalog({
   getVariantQuantity
 }: MenuCatalogProps) {
   const [heroIdx, setHeroIdx] = useState(0);
-  const [pageDirection, setPageDirection] = useState<1 | -1>(1);
-  const prevCategoryIndexRef = useRef<number>(ALL_CATEGORIES.indexOf(activeCategory));
   const touchStartRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
 
   const activeCategoryIndex = ALL_CATEGORIES.indexOf(activeCategory);
 
   useEffect(() => {
     setHeroIdx(0);
-    const prevIdx = prevCategoryIndexRef.current;
-    if (activeCategoryIndex !== prevIdx) {
-      setPageDirection(activeCategoryIndex > prevIdx ? 1 : -1);
-      prevCategoryIndexRef.current = activeCategoryIndex;
-    }
-  }, [activeCategory, activeCategoryIndex, vegOnly]);
+  }, [activeCategory, vegOnly]);
 
   const flipCategoryPage = (delta: -1 | 1) => {
     const nextIndex = activeCategoryIndex + delta;
     if (nextIndex < 0 || nextIndex >= ALL_CATEGORIES.length) return;
-    setPageDirection(delta);
     onSelectCategory(ALL_CATEGORIES[nextIndex]);
   };
 
@@ -224,30 +215,13 @@ export function MenuCatalog({
         </div>
       )}
 
-      {/* Menu Page-Turn Viewport (Fast GPU slide without 3D preserve-3d flicker on mobile) */}
+      {/* Menu Page-Turn Viewport (Static at rest so 130+ items never drop GPU tiles on mobile scroll) */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         className="overflow-x-clip"
       >
-        <AnimatePresence mode="popLayout" initial={false} custom={pageDirection}>
-          <motion.div
-            key={activeCategory}
-            custom={pageDirection}
-            initial={{
-              opacity: 0,
-              x: pageDirection > 0 ? 36 : -36
-            }}
-            animate={{
-              opacity: 1,
-              x: 0
-            }}
-            exit={{
-              opacity: 0,
-              x: pageDirection > 0 ? -24 : 24
-            }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          >
+        <div key={activeCategory} className="category-page-enter">
 
       {/* Mobile Editorial Chef's AR Spotlight */}
       {showHeroSpotlight && activeHero && (
@@ -402,8 +376,7 @@ export function MenuCatalog({
           renderCategoryItems(items)
         )}
       </section>
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </div>
     </div>
   );

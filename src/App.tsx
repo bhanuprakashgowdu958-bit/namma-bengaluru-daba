@@ -283,16 +283,11 @@ export default function App() {
         totalDishCount={MENU_ITEMS.length}
         onEnterMenu={handleEnterMenu}
       />
-      {/* Pure OLED Obsidian + Warm Amber Spatial Refraction Glows */}
+      {/* Pure OLED Obsidian + Warm Amber Ambient Glows (lightweight radial gradients, zero scroll lag) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-      >
-        <div className="absolute -right-24 -top-24 h-[28rem] w-[28rem] rounded-full bg-[#D96B27]/16 blur-[130px]" />
-        <div className="absolute left-[-10%] top-[34%] h-[30rem] w-[30rem] rounded-full bg-[#F59E0B]/10 blur-[145px]" />
-        <div className="absolute -bottom-28 right-[18%] h-[26rem] w-[26rem] rounded-full bg-[#D96B27]/12 blur-[130px]" />
-        <div className="noise-grain absolute inset-0 opacity-[0.035]" />
-      </div>
+        className="pointer-events-none fixed inset-0 overflow-hidden bg-[radial-gradient(circle_at_90%_8%,rgba(217,107,39,0.14),transparent_42%),radial-gradient(circle_at_8%_42%,rgba(245,158,11,0.09),transparent_45%),radial-gradient(circle_at_80%_92%,rgba(217,107,39,0.11),transparent_44%)]"
+      />
 
       {/* Responsive Shell: Mobile single column | Desktop >=1024px Editorial 55/45 Split-Screen */}
       <div className="relative z-10 mx-auto flex max-w-[1600px] flex-col lg:flex-row">

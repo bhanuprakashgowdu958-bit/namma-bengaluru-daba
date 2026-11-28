@@ -42,20 +42,19 @@ export function MenuCard({
         onClick={() => {
           if (isAR) onInspectAR(item);
         }}
-        className={`liquid-glass-card group relative flex cursor-pointer flex-col overflow-hidden rounded-[22px] border transition-all duration-300 ${
+        className={`liquid-glass-card group relative flex cursor-pointer flex-col overflow-hidden rounded-[22px] border transition-colors duration-200 ${
           isSelectedOnDesktop
             ? 'border-[#D96B27]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_0_1px_rgba(217,107,39,0.35),0_18px_40px_-10px_rgba(217,107,39,0.28)]'
             : 'border-white/12 hover:border-white/25'
         }`}
       >
         {/* Full-bleed Top Photo Stage */}
-        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#141210]">
+        <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#181512]">
           <img
             src={item.poster}
             alt={item.name}
             loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover object-center transition duration-500 ease-out group-hover:scale-105"
+            className="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-105"
           />
           <div
             aria-hidden="true"
@@ -63,10 +62,10 @@ export function MenuCard({
           />
 
           <div className="absolute inset-x-2.5 top-2.5 flex items-center justify-between gap-1.5">
-            <span className="inline-flex rounded-lg bg-black/55 p-1 backdrop-blur-md">
+            <span className="inline-flex rounded-lg bg-[#0A0A0D]/80 p-1">
               <DietaryBadge type={item.diet} />
             </span>
-            <span className="liquid-glass-pill inline-flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[9.5px] font-semibold tracking-wide text-[#F7F3EC]">
+            <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-[#0A0A0D]/80 px-2 py-0.5 text-[9.5px] font-semibold tracking-wide text-[#F7F3EC]">
               <Box className="h-2.5 w-2.5 text-[#D96B27]" />
               1:1 AR
             </span>
@@ -161,7 +160,7 @@ export function MenuCard({
   return (
     <article
       onClick={() => onInspectAR(item)}
-      className={`liquid-glass-card group relative flex cursor-pointer items-center gap-3.5 rounded-[22px] border p-3.5 transition-all duration-300 ${
+      className={`liquid-glass-card group relative flex cursor-pointer items-center gap-3.5 rounded-[22px] border p-3.5 transition-colors duration-200 ${
         isSelectedOnDesktop
           ? 'border-[#D96B27]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_0_1px_rgba(217,107,39,0.35),0_18px_40px_-10px_rgba(217,107,39,0.28)]'
           : 'border-white/12 hover:border-white/25'
@@ -174,14 +173,13 @@ export function MenuCard({
             src={item.poster}
             alt={item.name}
             loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
           />
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-white/5"
           />
-          <span className="liquid-glass-pill absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full border border-white/25 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F7F3EC]">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-[#0A0A0D]/80 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#F7F3EC] absolute bottom-1.5 left-1.5">
             <Box className="h-2.5 w-2.5 text-[#D96B27]" />
             3D / AR
           </span>
