@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Box, Search, X } from 'lucide-react';
+import { Box, QrCode, Search, X } from 'lucide-react';
 import { MENU_CATEGORIES, MENU_ITEMS, RESTAURANT_CONFIG } from '../data/menu';
 import type { MenuCategory } from '../types/menu';
 
@@ -13,9 +13,11 @@ interface HeaderFiltersProps {
   onSelectCategory: (cat: CategoryFilter) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  tableNumber?: string;
+  onOpenMenuQR?: () => void;
 }
 
-const ALL_CATEGORIES: CategoryFilter[] = ['All', ...MENU_CATEGORIES];
+export const ALL_CATEGORIES: CategoryFilter[] = ['All', ...MENU_CATEGORIES];
 
 const CATEGORY_BANNERS: Record<
   CategoryFilter,
@@ -59,9 +61,21 @@ export function HeaderFilters({
   activeCategory,
   onSelectCategory,
   searchQuery,
-  onSearchChange
+  onSearchChange,
+  tableNumber,
+  onOpenMenuQR
 }: HeaderFiltersProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    const activeBtn = tabRefs.current[activeCategory];
+    activeBtn?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'center',
+      block: 'nearest'
+    });
+  }, [activeCategory]);
 
   const categoryCounts = useMemo(() => {
     const counts = new Map<CategoryFilter, number>();
@@ -95,24 +109,41 @@ export function HeaderFilters({
               {RESTAURANT_CONFIG.brandName}
             </h1>
           </div>
-          <p className="mt-0.5 truncate text-[10px] font-medium uppercase tracking-[0.16em] text-[#A8A29E]">
-            3D &amp; 1:1 Table AR Kitchen
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-medium uppercase tracking-[0.16em] text-[#A8A29E]">
+            <span>3D &amp; 1:1 Table AR Kitchen</span>
+            {tableNumber?.trim() && (
+              <span className="rounded-full border border-[#D96B27]/50 bg-[#D96B27]/15 px-2 py-0.5 text-[9px] font-bold text-[#F4A26E]">
+                Table #{tableNumber.trim()}
+              </span>
+            )}
           </p>
         </div>
 
-        {/* Search Icon (>= 44x44px touch target) */}
-        <button
-          type="button"
-          onClick={toggleSearch}
-          aria-label={isSearchOpen ? 'Close search' : 'Search dishes'}
-          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition active:scale-95 ${
-            isSearchOpen || searchQuery
-              ? 'border-[#D96B27]/75 bg-[#D96B27]/20 text-[#F7F3EC] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]'
-              : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
-          }`}
-        >
-          {isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
-        </button>
+        {/* Share QR & Search Icons (>= 44x44px touch targets) */}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {onOpenMenuQR && (
+            <button
+              type="button"
+              onClick={onOpenMenuQR}
+              aria-label="Show Table Menu QR Code"
+              className="liquid-glass-pill inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 text-[#A8A29E] transition hover:border-white/25 hover:text-[#F7F3EC] active:scale-95"
+            >
+              <QrCode className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={toggleSearch}
+            aria-label={isSearchOpen ? 'Close search' : 'Search dishes'}
+            className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border transition active:scale-95 ${
+              isSearchOpen || searchQuery
+                ? 'border-[#D96B27]/75 bg-[#D96B27]/20 text-[#F7F3EC] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]'
+                : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
+            }`}
+          >
+            {isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
 
       {/* Row 2: Zomato-style Pure Veg Sliding Switch + Subtle 3D/AR Note */}
@@ -225,6 +256,9 @@ export function HeaderFilters({
           return (
             <button
               key={category}
+              ref={(node) => {
+                tabRefs.current[category] = node;
+              }}
               type="button"
               onClick={() => onSelectCategory(category)}
               aria-pressed={isActive}

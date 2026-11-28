@@ -104,7 +104,10 @@ export function MenuCard({
                         : 'border-white/10 bg-black/30 text-[#A8A29E] hover:text-[#F7F3EC]'
                     }`}
                   >
-                    {variant.label}
+                    {variant.label} •{' '}
+                    <span className="tabular-nums text-[#F4A26E]">
+                      {formatINR(variant.price)}
+                    </span>
                   </button>
                 );
               })}
@@ -157,12 +160,8 @@ export function MenuCard({
 
   return (
     <article
-      onClick={() => {
-        if (isAR) onInspectAR(item);
-      }}
-      className={`liquid-glass-card group relative flex items-center gap-3.5 rounded-[22px] border p-3.5 transition-all duration-300 ${
-        isAR ? 'cursor-pointer' : ''
-      } ${
+      onClick={() => onInspectAR(item)}
+      className={`liquid-glass-card group relative flex cursor-pointer items-center gap-3.5 rounded-[22px] border p-3.5 transition-all duration-300 ${
         isSelectedOnDesktop
           ? 'border-[#D96B27]/85 shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_0_0_1px_rgba(217,107,39,0.35),0_18px_40px_-10px_rgba(217,107,39,0.28)]'
           : 'border-white/12 hover:border-white/25'

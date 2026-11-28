@@ -231,6 +231,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
     return (
       <div
         className={`relative flex h-full w-full items-center justify-center overflow-hidden studio-spotlight select-none ${className}`}
+        style={{ perspective: 1400 }}
         onPointerDown={() => setShowGestureHint(false)}
       >
         <div
@@ -238,53 +239,72 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_55%,rgba(217,107,39,0.10),transparent_58%)]"
         />
 
-        {hasAR ? (
-          <model-viewer
+        <AnimatePresence mode="popLayout">
+          <motion.div
             key={item.id}
-            ref={viewerRef}
-            src={modelGlbSrc}
-            ios-src={modelUsdzSrc}
-            poster={item.poster}
-            alt={`${item.name} studio dish preview`}
-            ar
-            ar-modes="scene-viewer webxr quick-look"
-            ar-scale="fixed"
-            ar-placement="floor"
-            reveal={hasInteractive3D ? 'auto' : 'manual'}
-            camera-controls
-            shadow-intensity="1.2"
-            shadow-softness="0.85"
-            exposure="1.0"
-            environment-image="neutral"
-            camera-orbit={DEFAULT_ORBIT}
-            field-of-view="24deg"
-            min-camera-orbit="auto 16deg 55%"
-            max-camera-orbit="auto 80deg 115%"
-            interaction-prompt="none"
-            touch-action="pan-y"
-            loading={hasInteractive3D ? 'eager' : 'lazy'}
-            className="relative z-10 h-full w-full"
+            initial={{ opacity: 0.35, scale: 1.08, clipPath: 'circle(0% at 50% 50%)' }}
+            animate={{ opacity: 1, scale: 1, clipPath: 'circle(150% at 50% 50%)' }}
+            exit={{ opacity: 0, scale: 0.96, clipPath: 'circle(0% at 50% 50%)' }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative z-10 flex h-full w-full items-center justify-center overflow-hidden"
           >
-            {/* Full-bleed Studio Food Photograph Poster Slot (zero side gaps) */}
-            {item.poster && (
-              <div
-                slot="poster"
-                className="relative h-full w-full overflow-hidden bg-[#08080A]"
+            {/* Expanding Saffron Spotlight Iris Ring */}
+            <motion.div
+              aria-hidden="true"
+              initial={{ scale: 0.15, opacity: 0.9 }}
+              animate={{ scale: 1.9, opacity: 0 }}
+              transition={{ duration: 0.58, ease: [0.22, 1, 0.36, 1] }}
+              className="pointer-events-none absolute z-20 h-64 w-64 rounded-full border-2 border-[#F4A26E]/65 shadow-[0_0_48px_rgba(217,107,39,0.55)]"
+            />
+
+            {hasAR ? (
+              <model-viewer
+                ref={viewerRef}
+                src={modelGlbSrc}
+                ios-src={modelUsdzSrc}
+                poster={item.poster}
+                alt={`${item.name} studio dish preview`}
+                ar
+                ar-modes="scene-viewer webxr quick-look"
+                ar-scale="fixed"
+                ar-placement="floor"
+                reveal={hasInteractive3D ? 'auto' : 'manual'}
+                camera-controls
+                shadow-intensity="1.2"
+                shadow-softness="0.85"
+                exposure="1.0"
+                environment-image="neutral"
+                camera-orbit={DEFAULT_ORBIT}
+                field-of-view="24deg"
+                min-camera-orbit="auto 16deg 55%"
+                max-camera-orbit="auto 80deg 115%"
+                interaction-prompt="none"
+                touch-action="pan-y"
+                loading={hasInteractive3D ? 'eager' : 'lazy'}
+                className="relative z-10 h-full w-full"
               >
-                <img
-                  src={item.poster}
-                  alt={item.name}
-                  className="h-full w-full object-cover object-center"
-                />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
-                />
-              </div>
-            )}
-            <span slot="ar-button" className="hidden" aria-hidden="true" />
-          </model-viewer>
-        ) : null}
+                {/* Full-bleed Studio Food Photograph Poster Slot (zero side gaps) */}
+                {item.poster && (
+                  <div
+                    slot="poster"
+                    className="relative h-full w-full overflow-hidden bg-[#08080A]"
+                  >
+                    <img
+                      src={item.poster}
+                      alt={item.name}
+                      className="h-full w-full object-cover object-center"
+                    />
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/65"
+                    />
+                  </div>
+                )}
+                <span slot="ar-button" className="hidden" aria-hidden="true" />
+              </model-viewer>
+            ) : null}
+          </motion.div>
+        </AnimatePresence>
 
         {/* Minimalist Spatial AR Viewfinder Corner Brackets */}
         {hasAR && (
@@ -383,9 +403,15 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
           )}
         </AnimatePresence>
 
-        {/* Floating Top-Left Glass Pills */}
+        {/* Floating Top-Left Glass Pills (PPT Entrance) */}
         {showMetadataPills && (
-          <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2 pr-14">
+          <motion.div
+            key={`pills-${item.id}`}
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.28, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
+            className="pointer-events-none absolute left-4 top-4 z-20 flex flex-wrap items-center gap-2 pr-14"
+          >
             <span className="liquid-glass-pill inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-[#F7F3EC]">
               <DietaryBadge type={item.diet} showLabel />
             </span>
@@ -395,7 +421,7 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
                 1:1 • {item.realWorldDimensions ?? 'True Scale'}
               </span>
             )}
-          </div>
+          </motion.div>
         )}
 
         {/* Reset View Button (only if an item uses a custom Polycam/Luma 3D scan) */}

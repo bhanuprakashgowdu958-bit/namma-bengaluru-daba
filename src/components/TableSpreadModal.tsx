@@ -54,6 +54,7 @@ export function TableSpreadModal({
   const [arNotice, setArNotice] = useState<string | null>(null);
   const [sceneViewerFailed, setSceneViewerFailed] = useState(false);
   const [canUseWebXR, setCanUseWebXR] = useState(false);
+  const [viewMode, setViewMode] = useState<'photos' | '3d'>('photos');
 
   const totalDishes = items.reduce((sum, entry) => sum + entry.quantity, 0);
   const totalAmount = items.reduce(
@@ -261,10 +262,31 @@ export function TableSpreadModal({
         {/* Top 56% (Mobile) / Left 62% Full-Height (Desktop): Zero-Gap Full-Bleed Dish Presentation */}
         <div className="relative flex h-[56dvh] min-h-[320px] w-full shrink-0 flex-col overflow-hidden bg-[#070709] lg:h-full lg:w-[62%]">
           <div className="pointer-events-none absolute left-3.5 top-4 z-20 flex flex-wrap items-center gap-1.5 pr-14 sm:left-4 sm:gap-2">
-            <span className="liquid-glass-pill inline-flex items-center gap-1.5 rounded-full border border-[#D96B27]/45 px-2.5 py-1 text-[11px] font-semibold text-[#F4A26E] sm:px-3 sm:py-1.5 sm:text-xs">
-              <Sparkles className="h-3 w-3 text-[#D96B27] sm:h-3.5 sm:w-3.5" />
-              Table Spread
-            </span>
+            <div className="pointer-events-auto inline-flex items-center rounded-full border border-white/20 bg-black/55 p-0.5 backdrop-blur-xl">
+              <button
+                type="button"
+                onClick={() => setViewMode('photos')}
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                  viewMode === 'photos'
+                    ? 'bg-[#D96B27] text-[#F7F3EC]'
+                    : 'text-[#D6D0C8] hover:text-[#F7F3EC]'
+                }`}
+              >
+                Photos
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('3d')}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                  viewMode === '3d'
+                    ? 'bg-[#D96B27] text-[#F7F3EC]'
+                    : 'text-[#D6D0C8] hover:text-[#F7F3EC]'
+                }`}
+              >
+                <Sparkles className="h-3 w-3" />
+                3D Table
+              </button>
+            </div>
             {spread && (
               <span className="liquid-glass-pill inline-flex items-center gap-1 rounded-full border border-white/20 px-2.5 py-1 text-[11px] font-semibold text-[#F7F3EC] sm:px-3 sm:py-1.5 sm:text-xs">
                 <Ruler className="h-3 w-3 text-[#D96B27] sm:h-3.5 sm:w-3.5" />
@@ -285,6 +307,37 @@ export function TableSpreadModal({
           {buildError ? (
             <div className="flex h-full items-center justify-center px-6 text-center">
               <p className="text-sm text-red-400">{buildError}</p>
+            </div>
+          ) : viewMode === '3d' ? (
+            <div className="relative h-full w-full studio-spotlight">
+              {spread?.glbUrl ? (
+                <>
+                  <model-viewer
+                    key={spread.glbUrl}
+                    src={spread.glbUrl}
+                    alt="Interactive 3D Table Spread"
+                    camera-controls
+                    auto-rotate
+                    auto-rotate-delay="600"
+                    shadow-intensity="1.1"
+                    shadow-softness="0.85"
+                    exposure="1.05"
+                    environment-image="neutral"
+                    camera-orbit="0deg 46deg 88%"
+                    field-of-view="26deg"
+                    touch-action="pan-y"
+                    className="h-full w-full"
+                  />
+                  <span className="liquid-glass-pill pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/20 px-3 py-1 text-[11px] font-medium text-[#F7F3EC]">
+                    Drag to rotate • Pinch to zoom 3D Table
+                  </span>
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-xs text-[#A8A29E]">
+                  <Box className="h-6 w-6 animate-pulse text-[#D96B27]" />
+                  <span>Arranging plates on 3D table...</span>
+                </div>
+              )}
             </div>
           ) : displayPlates.length === 1 ? (
             /* Single Dish Full-Bleed Edge-to-Edge Studio Photograph (zero white gaps) */

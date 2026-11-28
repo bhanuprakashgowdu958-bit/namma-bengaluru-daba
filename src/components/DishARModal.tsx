@@ -71,10 +71,10 @@ export function DishARModal({
     <AnimatePresence>
       <motion.div
         key={item.id}
-        initial={{ opacity: 0, y: '100%' }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: '100%' }}
-        transition={{ type: 'spring', stiffness: 360, damping: 36 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
         className={`fixed inset-0 z-50 flex flex-col lg:hidden ${
           isAREnabled ? 'bg-[#070709]' : 'justify-end bg-black/75 backdrop-blur-md'
         }`}
@@ -83,9 +83,9 @@ export function DishARModal({
         aria-label={`${item.name} details`}
         onClick={!isAREnabled ? onClose : undefined}
       >
-        {/* Top 65% Stage for 3D / AR Hero Dishes */}
+        {/* Top 65% Stage for 3D / AR Hero Dishes (Spotlight Iris reveal inside ModelViewerStage) */}
         {isAREnabled && (
-          <div className="relative h-[62dvh] min-h-[350px] w-full shrink-0">
+          <div className="relative h-[62dvh] min-h-[350px] w-full shrink-0 overflow-hidden">
             <ModelViewerStage
               ref={stageRef}
               item={item}
@@ -117,7 +117,12 @@ export function DishARModal({
           }`}
         >
           <div>
-            <div className="flex items-start justify-between gap-3">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.26, delay: 0.06, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-start justify-between gap-3"
+            >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <DietaryBadge type={item.diet} size="sm" showLabel />
@@ -145,17 +150,27 @@ export function DishARModal({
                   </button>
                 )}
               </div>
-            </div>
+            </motion.div>
 
             {item.description && (
-              <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#A8A29E]">
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.24, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-2 line-clamp-2 text-xs leading-relaxed text-[#A8A29E]"
+              >
                 {item.description}
-              </p>
+              </motion.p>
             )}
 
             {/* Variant Chips (Regular / Half / Full / Veg / Chicken) */}
             {item.variants.length > 1 && (
-              <div className="mt-3.5">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.24, delay: 0.16, ease: [0.22, 1, 0.36, 1] }}
+                className="mt-3.5"
+              >
                 <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-[#A8A29E]">
                   Choose Option
                 </p>
@@ -181,7 +196,7 @@ export function DishARModal({
                     );
                   })}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {arHintMessage && (
@@ -191,8 +206,13 @@ export function DishARModal({
             )}
           </div>
 
-          {/* Dual Primary Action Bar (Thumb-Reachable) */}
-          <div className="mt-5 space-y-2.5 pt-1">
+          {/* Dual Primary Action Bar (PPT Slide-Up Entrance) */}
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.26, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-5 space-y-2.5 pt-1"
+          >
             {isAREnabled &&
               (isAndroidDevice() && item.modelGlb ? (
                 <a
@@ -258,7 +278,7 @@ export function DishARModal({
                 )}
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       </motion.div>
     </AnimatePresence>

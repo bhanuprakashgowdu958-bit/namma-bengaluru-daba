@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Box, Plus, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { BookOpen, Box, ChevronLeft, ChevronRight, Plus, Sparkles } from 'lucide-react';
 import type { MenuItem, PriceVariant } from '../types/menu';
 import { formatINR, getDefaultVariant } from '../utils/format';
 import { DietaryBadge } from './DietaryBadge';
-import { type CategoryFilter, HeaderFilters } from './HeaderFilters';
+import { ALL_CATEGORIES, type CategoryFilter, HeaderFilters } from './HeaderFilters';
 import { MenuCard } from './MenuCard';
 
 interface MenuCatalogProps {
@@ -15,6 +16,8 @@ interface MenuCatalogProps {
   onSelectCategory: (cat: CategoryFilter) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  tableNumber?: string;
+  onOpenMenuQR?: () => void;
   onInspectAR: (item: MenuItem) => void;
   onAddVariant: (item: MenuItem, variant: PriceVariant) => void;
   onDecrementVariant: (item: MenuItem, variant: PriceVariant) => void;
@@ -42,16 +45,61 @@ export function MenuCatalog({
   onSelectCategory,
   searchQuery,
   onSearchChange,
+  tableNumber,
+  onOpenMenuQR,
   onInspectAR,
   onAddVariant,
   onDecrementVariant,
   getVariantQuantity
 }: MenuCatalogProps) {
   const [heroIdx, setHeroIdx] = useState(0);
+  const [pageDirection, setPageDirection] = useState<1 | -1>(1);
+  const prevCategoryIndexRef = useRef<number>(ALL_CATEGORIES.indexOf(activeCategory));
+  const touchStartRef = useRef<{ x: number; y: number; ignore: boolean } | null>(null);
+
+  const activeCategoryIndex = ALL_CATEGORIES.indexOf(activeCategory);
 
   useEffect(() => {
     setHeroIdx(0);
-  }, [activeCategory, vegOnly]);
+    const prevIdx = prevCategoryIndexRef.current;
+    if (activeCategoryIndex !== prevIdx) {
+      setPageDirection(activeCategoryIndex > prevIdx ? 1 : -1);
+      prevCategoryIndexRef.current = activeCategoryIndex;
+    }
+  }, [activeCategory, activeCategoryIndex, vegOnly]);
+
+  const flipCategoryPage = (delta: -1 | 1) => {
+    const nextIndex = activeCategoryIndex + delta;
+    if (nextIndex < 0 || nextIndex >= ALL_CATEGORIES.length) return;
+    setPageDirection(delta);
+    onSelectCategory(ALL_CATEGORIES[nextIndex]);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    const insideHorizontalStrip = Boolean(target?.closest('.no-scrollbar'));
+    const touch = e.touches[0];
+    if (!touch) return;
+    touchStartRef.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      ignore: insideHorizontalStrip
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start || start.ignore || searchQuery.trim()) return;
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    // Trigger page turn only on deliberate horizontal swipes
+    if (Math.abs(dx) > 64 && Math.abs(dx) > Math.abs(dy) * 1.45) {
+      flipCategoryPage(dx < 0 ? 1 : -1);
+    }
+  };
 
   const signatureHeroes = useMemo(() => {
     const preferredIds = CATEGORY_HERO_IDS[activeCategory] ?? [];
@@ -137,7 +185,77 @@ export function MenuCatalog({
         onSelectCategory={onSelectCategory}
         searchQuery={searchQuery}
         onSearchChange={onSearchChange}
+        tableNumber={tableNumber}
+        onOpenMenuQR={onOpenMenuQR}
       />
+
+      {/* Menu Book Page Indicator & Swipe Navigation Bar */}
+      {!searchQuery.trim() && (
+        <div className="mx-3.5 mt-2 flex items-center justify-between gap-2 rounded-2xl border border-white/10 bg-[#12100E]/70 px-3 py-1.5 backdrop-blur-md sm:mx-5">
+          <button
+            type="button"
+            onClick={() => flipCategoryPage(-1)}
+            disabled={activeCategoryIndex <= 0}
+            aria-label="Previous menu page"
+            className="inline-flex h-8 items-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-[#D6D0C8] transition hover:bg-white/5 disabled:opacity-30"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Prev
+          </button>
+
+          <div className="flex items-center gap-1.5 text-[11px] text-[#A8A29E]">
+            <BookOpen className="h-3 w-3 text-[#D96B27]" />
+            <span className="font-semibold text-[#F7F3EC]">{activeCategory}</span>
+            <span className="tabular-nums text-[#A8A29E]">
+              • Page {activeCategoryIndex + 1}/{ALL_CATEGORIES.length}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => flipCategoryPage(1)}
+            disabled={activeCategoryIndex >= ALL_CATEGORIES.length - 1}
+            aria-label="Next menu page"
+            className="inline-flex h-8 items-center gap-0.5 rounded-xl px-2 text-[11px] font-medium text-[#D6D0C8] transition hover:bg-white/5 disabled:opacity-30"
+          >
+            Next
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 3D Book Page-Turn Viewport (Tap category or swipe left/right) */}
+      <div
+        style={{ perspective: 1500 }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="overflow-x-hidden"
+      >
+        <AnimatePresence mode="wait" custom={pageDirection}>
+          <motion.div
+            key={activeCategory}
+            custom={pageDirection}
+            initial={{
+              opacity: 0,
+              rotateY: pageDirection > 0 ? 14 : -14,
+              x: pageDirection > 0 ? 32 : -32
+            }}
+            animate={{
+              opacity: 1,
+              rotateY: 0,
+              x: 0
+            }}
+            exit={{
+              opacity: 0,
+              rotateY: pageDirection > 0 ? -14 : 14,
+              x: pageDirection > 0 ? -32 : 32
+            }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              transformOrigin: pageDirection > 0 ? 'left center' : 'right center',
+              transformStyle: 'preserve-3d'
+            }}
+          >
 
       {/* Mobile Editorial Chef's AR Spotlight */}
       {showHeroSpotlight && activeHero && (
@@ -292,6 +410,9 @@ export function MenuCatalog({
           renderCategoryItems(items)
         )}
       </section>
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

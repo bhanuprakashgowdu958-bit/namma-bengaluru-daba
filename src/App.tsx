@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Box, Check, ChevronLeft, ChevronRight, Minus, Plus, Ruler, Sparkles } from 'lucide-react';
 import { DesktopQRModal } from './components/DesktopQRModal';
 import { DietaryBadge } from './components/DietaryBadge';
 import { DishARModal } from './components/DishARModal';
 import type { CategoryFilter } from './components/HeaderFilters';
 import { MenuCatalog } from './components/MenuCatalog';
+import { MenuCoverOverlay } from './components/MenuCoverOverlay';
 import { ModelViewerStage } from './components/ModelViewerStage';
 import { TableSpreadModal } from './components/TableSpreadModal';
 import { TableTrayDrawer } from './components/TableTrayDrawer';
@@ -42,10 +44,26 @@ export default function App() {
   const [trayItems, setTrayItems] = useState<CartItem[]>([]);
   const [isTrayOpen, setIsTrayOpen] = useState(false);
   const [isSpreadOpen, setIsSpreadOpen] = useState(false);
+  const [tableNumber, setTableNumber] = useState('');
+  const [showMenuCover, setShowMenuCover] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('dish') || params.get('spread')) return false;
+    try {
+      return window.sessionStorage.getItem('nb_menu_opened') !== '1';
+    } catch {
+      return true;
+    }
+  });
 
-  // Deep-link ?dish=<id> and ?spread=<id:variant:qty,...> support for QR handoff
+  // Deep-link ?table=<num>, ?dish=<id>, and ?spread=<id:variant:qty,...> support
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    const tableParam = params.get('table');
+    if (tableParam) {
+      setTableNumber(tableParam.trim());
+    }
 
     const spreadParam = params.get('spread');
     if (spreadParam) {
@@ -105,9 +123,12 @@ export default function App() {
     });
   }, [vegOnly, activeCategory, searchQuery]);
 
-  // Add item variant to Table Tray
+  // Add item variant to Table Tray with subtle mobile tactile pulse
   const addToTray = (item: MenuItem, variant: PriceVariant, quantity = 1) => {
     const cartKey = buildCartKey(item.id, variant.label);
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(12);
+    }
 
     setTrayItems((prev) => {
       const existing = prev.find((entry) => entry.cartKey === cartKey);
@@ -199,8 +220,41 @@ export default function App() {
     setDesktopJustAdded(false);
   };
 
+  const handleEnterMenu = () => {
+    setShowMenuCover(false);
+    try {
+      window.sessionStorage.setItem('nb_menu_opened', '1');
+    } catch {
+      // Ignore storage errors in private mode
+    }
+  };
+
+  const handleOpenMenuQR = () => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('dish');
+    url.searchParams.delete('spread');
+    if (tableNumber.trim()) {
+      url.searchParams.set('table', tableNumber.trim());
+    }
+    setSpreadQrPayload({
+      url: url.toString(),
+      title: 'Namma Bengaluru Daba 3D Menu',
+      subtitle: tableNumber.trim()
+        ? `Table #${tableNumber.trim()} • Scan for 3D & AR`
+        : 'Scan on Mobile for 3D & AR'
+    });
+  };
+
   return (
     <div className="relative min-h-screen bg-[#070709] text-[#F7F3EC]">
+      <MenuCoverOverlay
+        isVisible={showMenuCover}
+        tableNumber={tableNumber}
+        arDishCount={featuredArItems.length}
+        totalDishCount={MENU_ITEMS.length}
+        onEnterMenu={handleEnterMenu}
+      />
       {/* Pure OLED Obsidian + Warm Amber Spatial Refraction Glows */}
       <div
         aria-hidden="true"
@@ -249,71 +303,81 @@ export default function App() {
           </div>
 
           {/* Floating Liquid Glass Spec & Order Deck */}
-          <div className="liquid-glass mt-4 rounded-[28px] border border-white/15 px-7 py-5">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <DietaryBadge type={desktopActiveItem.diet} size="md" showLabel />
-                  <span className="text-xs text-[#A8A29E]">•</span>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#A8A29E]">
-                    {desktopActiveItem.category}
-                  </span>
-                  {desktopActiveItem.realWorldDimensions && (
-                    <>
+          <div className="liquid-glass mt-4 rounded-[28px] border border-white/15 px-7 py-5 overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={desktopActiveItem.id}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2.5">
+                      <DietaryBadge type={desktopActiveItem.diet} size="md" showLabel />
                       <span className="text-xs text-[#A8A29E]">•</span>
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-[#A8A29E]">
-                        <Ruler className="h-3.5 w-3.5 text-[#D96B27]" />
-                        {desktopActiveItem.realWorldDimensions}
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#A8A29E]">
+                        {desktopActiveItem.category}
                       </span>
-                    </>
-                  )}
+                      {desktopActiveItem.realWorldDimensions && (
+                        <>
+                          <span className="text-xs text-[#A8A29E]">•</span>
+                          <span className="inline-flex items-center gap-1 text-xs font-medium text-[#A8A29E]">
+                            <Ruler className="h-3.5 w-3.5 text-[#D96B27]" />
+                            {desktopActiveItem.realWorldDimensions}
+                          </span>
+                        </>
+                      )}
+                    </div>
+
+                    <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#F7F3EC] xl:text-3xl">
+                      {desktopActiveItem.name}
+                    </h2>
+                    {desktopActiveItem.description && (
+                      <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[#A8A29E] xl:text-sm">
+                        {desktopActiveItem.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <span className="text-2xl font-bold tabular-nums text-[#F7F3EC]">
+                      {formatINR(desktopVariant.price)}
+                    </span>
+                    <p className="mt-0.5 text-xs text-[#A8A29E]">
+                      {desktopVariant.label}
+                    </p>
+                  </div>
                 </div>
 
-                <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#F7F3EC] xl:text-3xl">
-                  {desktopActiveItem.name}
-                </h2>
-                {desktopActiveItem.description && (
-                  <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-[#A8A29E] xl:text-sm">
-                    {desktopActiveItem.description}
-                  </p>
+                {desktopActiveItem.variants.length > 1 && (
+                  <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-[#A8A29E]">Portion / Variant:</span>
+                    {desktopActiveItem.variants.map((variant) => {
+                      const active = desktopVariant.label === variant.label;
+                      return (
+                        <button
+                          key={variant.label}
+                          type="button"
+                          onClick={() => setDesktopVariant(variant)}
+                          className={`min-h-[38px] rounded-full border px-3.5 text-xs font-medium transition ${
+                            active
+                              ? 'border-[#D96B27] bg-[#D96B27]/20 text-[#F7F3EC]'
+                              : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
+                          }`}
+                        >
+                          {variant.label} •{' '}
+                          <span className="tabular-nums text-[#F4A26E]">
+                            {formatINR(variant.price)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </div>
-
-              <div className="shrink-0 text-right">
-                <span className="text-2xl font-bold tabular-nums text-[#F7F3EC]">
-                  {formatINR(desktopVariant.price)}
-                </span>
-                <p className="mt-0.5 text-xs text-[#A8A29E]">
-                  {desktopVariant.label}
-                </p>
-              </div>
-            </div>
-
-            {desktopActiveItem.variants.length > 1 && (
-              <div className="mt-3.5 flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-[#A8A29E]">Portion / Variant:</span>
-                {desktopActiveItem.variants.map((variant) => {
-                  const active = desktopVariant.label === variant.label;
-                  return (
-                    <button
-                      key={variant.label}
-                      type="button"
-                      onClick={() => setDesktopVariant(variant)}
-                      className={`min-h-[38px] rounded-full border px-3.5 text-xs font-medium transition ${
-                        active
-                          ? 'border-[#D96B27] bg-[#D96B27]/20 text-[#F7F3EC]'
-                          : 'liquid-glass-pill border-white/15 text-[#A8A29E] hover:border-white/25 hover:text-[#F7F3EC]'
-                      }`}
-                    >
-                      {variant.label} •{' '}
-                      <span className="tabular-nums text-[#F4A26E]">
-                        {formatINR(variant.price)}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+              </motion.div>
+            </AnimatePresence>
 
             <div className="mt-4 flex items-center gap-3">
               <button
@@ -368,7 +432,7 @@ export default function App() {
         </aside>
 
         {/* RIGHT (45% on Desktop, 100% on Mobile): Menu Catalog */}
-        <main className="mx-auto w-full max-w-lg lg:mx-0 lg:w-[45%] lg:max-w-none">
+        <main className="mx-auto w-full max-w-lg overflow-x-hidden lg:mx-0 lg:w-[45%] lg:max-w-none">
           <MenuCatalog
             items={filteredItems}
             selectedItemId={desktopActiveItem.id}
@@ -378,6 +442,8 @@ export default function App() {
             onSelectCategory={setActiveCategory}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            tableNumber={tableNumber}
+            onOpenMenuQR={handleOpenMenuQR}
             onInspectAR={handleInspectAR}
             onAddVariant={(item, variant) => addToTray(item, variant, 1)}
             onDecrementVariant={handleDecrementVariant}
@@ -397,6 +463,8 @@ export default function App() {
       <TableTrayDrawer
         items={trayItems}
         isOpen={isTrayOpen}
+        tableNumber={tableNumber}
+        onTableNumberChange={setTableNumber}
         onOpen={() => setIsTrayOpen(true)}
         onClose={() => setIsTrayOpen(false)}
         onUpdateQuantity={handleUpdateTrayQty}
