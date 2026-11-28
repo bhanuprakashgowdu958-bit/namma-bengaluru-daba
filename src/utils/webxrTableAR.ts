@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export interface AnchoredARSessionHandle {
   stop: () => Promise<void>;
@@ -11,6 +12,10 @@ export interface StartAnchoredTableAROptions {
   onStatusChange?: (status: 'scanning' | 'ready' | 'placed' | 'ended') => void;
   onError?: (message: string) => void;
 }
+
+type XRFrameWithAnchor = XRFrame & {
+  createAnchor?: (pose: XRRigidTransform, space: XRSpace) => Promise<XRAnchor>;
+};
 
 const loader = new GLTFLoader();
 
@@ -24,13 +29,13 @@ function createContactShadowTexture(): THREE.CanvasTexture {
     const grad = ctx.createRadialGradient(
       size * 0.5,
       size * 0.5,
-      size * 0.1,
+      size * 0.08,
       size * 0.5,
       size * 0.5,
       size * 0.5
     );
-    grad.addColorStop(0, 'rgba(0, 0, 0, 0.58)');
-    grad.addColorStop(0.55, 'rgba(0, 0, 0, 0.26)');
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0.44)');
+    grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.18)');
     grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -40,10 +45,10 @@ function createContactShadowTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function createReticleMesh(): THREE.Group {
+function createReticleMesh(): { group: THREE.Group; pulseRing: THREE.Mesh } {
   const group = new THREE.Group();
 
-  const outerGeo = new THREE.RingGeometry(0.085, 0.11, 48);
+  const outerGeo = new THREE.RingGeometry(0.085, 0.108, 48);
   outerGeo.rotateX(-Math.PI / 2);
   const outerMat = new THREE.MeshBasicMaterial({
     color: 0xf4a26e,
@@ -51,9 +56,10 @@ function createReticleMesh(): THREE.Group {
     opacity: 0.92,
     depthWrite: false
   });
-  group.add(new THREE.Mesh(outerGeo, outerMat));
+  const pulseRing = new THREE.Mesh(outerGeo, outerMat);
+  group.add(pulseRing);
 
-  const innerGeo = new THREE.CircleGeometry(0.016, 32);
+  const innerGeo = new THREE.CircleGeometry(0.014, 32);
   innerGeo.rotateX(-Math.PI / 2);
   const innerMat = new THREE.MeshBasicMaterial({
     color: 0xffffff,
@@ -64,7 +70,7 @@ function createReticleMesh(): THREE.Group {
   group.add(new THREE.Mesh(innerGeo, innerMat));
 
   group.visible = false;
-  return group;
+  return { group, pulseRing };
 }
 
 function buildOverlayElement(
@@ -76,13 +82,36 @@ function buildOverlayElement(
 ) {
   const overlay = document.createElement('div');
   overlay.style.cssText =
-    'position:fixed;inset:0;z-index:9999;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px max(22px,env(safe-area-inset-bottom)) 16px;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:#F7F3EC;';
+    'position:fixed;inset:0;z-index:9999;pointer-events:auto;touch-action:pan-y;display:flex;flex-direction:column;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 16px max(22px,env(safe-area-inset-bottom)) 16px;font-family:"Plus Jakarta Sans",system-ui,sans-serif;color:#F7F3EC;';
 
   const blockXRSelect = (el: HTMLElement) => {
     el.addEventListener('beforexrselect', (e) => {
       e.preventDefault();
     });
   };
+  blockXRSelect(overlay);
+
+  // Horizontal swipe anywhere on camera feed spins the locked dish smoothly in place
+  let dragStartX: number | null = null;
+  let lastDragX = 0;
+  overlay.addEventListener('pointerdown', (e) => {
+    if ((e.target as HTMLElement)?.closest('button')) return;
+    dragStartX = e.clientX;
+    lastDragX = e.clientX;
+  });
+  overlay.addEventListener('pointermove', (e) => {
+    if (dragStartX === null) return;
+    const dx = e.clientX - lastDragX;
+    lastDragX = e.clientX;
+    if (Math.abs(dx) > 0.5) {
+      callbacks.onRotate(dx * 0.0085);
+    }
+  });
+  const endDrag = () => {
+    dragStartX = null;
+  };
+  overlay.addEventListener('pointerup', endDrag);
+  overlay.addEventListener('pointercancel', endDrag);
 
   const topRow = document.createElement('div');
   topRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;';
@@ -91,7 +120,6 @@ function buildOverlayElement(
   titlePill.style.cssText =
     'pointer-events:auto;background:rgba(14,14,17,0.78);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.2);border-radius:999px;padding:8px 14px;font-size:12px;font-weight:600;max-width:74%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
   titlePill.textContent = `${title} • 1:1 Table AR`;
-  blockXRSelect(titlePill);
 
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
@@ -99,7 +127,6 @@ function buildOverlayElement(
   closeBtn.setAttribute('aria-label', 'Exit AR');
   closeBtn.style.cssText =
     'pointer-events:auto;width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.25);background:rgba(14,14,17,0.82);color:#F7F3EC;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer;';
-  blockXRSelect(closeBtn);
   closeBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     callbacks.onExit();
@@ -115,12 +142,11 @@ function buildOverlayElement(
   const hintPill = document.createElement('div');
   hintPill.style.cssText =
     'background:rgba(14,14,17,0.82);backdrop-filter:blur(16px);border:1px solid rgba(217,107,39,0.45);border-radius:999px;padding:8px 16px;font-size:12px;font-weight:500;color:#F7F3EC;text-align:center;';
-  hintPill.textContent = 'Detecting flat surface…';
+  hintPill.textContent = 'Move phone gently over your table or flat surface…';
 
   const controlsRow = document.createElement('div');
   controlsRow.style.cssText =
     'pointer-events:auto;display:none;align-items:center;justify-content:center;gap:10px;';
-  blockXRSelect(controlsRow);
 
   const rotateLeftBtn = document.createElement('button');
   rotateLeftBtn.type = 'button';
@@ -128,7 +154,6 @@ function buildOverlayElement(
   rotateLeftBtn.setAttribute('aria-label', 'Rotate dish left');
   rotateLeftBtn.style.cssText =
     'width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);backdrop-filter:blur(14px);color:#F7F3EC;font-size:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;';
-  blockXRSelect(rotateLeftBtn);
   rotateLeftBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     callbacks.onRotate(-Math.PI / 8);
@@ -140,7 +165,6 @@ function buildOverlayElement(
   rotateRightBtn.setAttribute('aria-label', 'Rotate dish right');
   rotateRightBtn.style.cssText =
     'width:44px;height:44px;border-radius:999px;border:1px solid rgba(255,255,255,0.22);background:rgba(14,14,17,0.82);backdrop-filter:blur(14px);color:#F7F3EC;font-size:18px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;';
-  blockXRSelect(rotateRightBtn);
   rotateRightBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     callbacks.onRotate(Math.PI / 8);
@@ -158,10 +182,11 @@ function buildOverlayElement(
     overlay,
     setUIState: (state: 'scanning' | 'placed', customHint?: string) => {
       if (state === 'scanning') {
-        hintPill.textContent = customHint ?? 'Detecting flat surface…';
+        hintPill.textContent = customHint ?? 'Move phone gently over your table or flat surface…';
         controlsRow.style.display = 'none';
       } else {
-        hintPill.textContent = customHint ?? 'Locked on surface (1:1 scale) • Walk around freely';
+        hintPill.textContent =
+          customHint ?? 'Locked on surface (1:1 scale) • Walk around or swipe to spin';
         controlsRow.style.display = 'flex';
       }
     }
@@ -169,10 +194,11 @@ function buildOverlayElement(
 }
 
 /**
- * Launches an automatically hardware-anchored WebXR Table AR session for Android Chrome.
- * Detects flat surfaces via `plane` + `point` hit-testing and downward fallback rays, then
- * automatically locks the dish onto the surface with an `XRAnchor` + micro-jitter deadband and
- * gravity alignment so it stays planted cleanly without a Move Dish unlock loop.
+ * Launches a Google-Animals-style WebXR Table AR session for Android Chrome.
+ * Waits for a verified flat surface (`plane` or multi-frame stable `point` consensus) instead of
+ * floating in mid-air, anchors directly to the physical surface via hardware `XRAnchor`
+ * (`hit.createAnchor()` + `frame.createAnchor()` fallback), and grounds dishes with PBR studio
+ * reflections, directional cast shadows, contact AO shadow, and a 4 mm anti-jitter deadband.
  */
 export async function startAnchoredTableAR(
   options: StartAnchoredTableAROptions
@@ -192,40 +218,59 @@ export async function startAnchoredTableAR(
   }
 
   let session: XRSession | null = null;
-  let centerHitTestSource: XRHitTestSource | null = null;
-  let angledHitTestSource: XRHitTestSource | null = null;
+  let planeCenterSource: XRHitTestSource | null = null;
+  let planeDownSource: XRHitTestSource | null = null;
+  let pointCenterSource: XRHitTestSource | null = null;
+  let pointDownSource: XRHitTestSource | null = null;
   let placedAnchor: XRAnchor | null = null;
   let renderer: THREE.WebGLRenderer | null = null;
+  let envRenderTarget: THREE.WebGLRenderTarget | null = null;
   let overlayHandle: ReturnType<typeof buildOverlayElement> | null = null;
   let ended = false;
 
   let isPlaced = false;
-  let needsSurfaceAnchorUpgrade = false;
-  let fallbackPlacedAt = 0;
+  let lockedByPlane = false;
+  let upgradeWindowStart = 0;
   let anchorStabilized = false;
+  let creatingAnchor = false;
   let userYaw = 0;
 
-  const cancelHitTestSources = () => {
+  const cancelPointSources = () => {
     try {
-      centerHitTestSource?.cancel();
+      pointCenterSource?.cancel();
     } catch {
       // Ignore
     }
-    centerHitTestSource = null;
+    pointCenterSource = null;
+    try {
+      pointDownSource?.cancel();
+    } catch {
+      // Ignore
+    }
+    pointDownSource = null;
+  };
 
+  const cancelAllHitTestSources = () => {
     try {
-      angledHitTestSource?.cancel();
+      planeCenterSource?.cancel();
     } catch {
       // Ignore
     }
-    angledHitTestSource = null;
+    planeCenterSource = null;
+    try {
+      planeDownSource?.cancel();
+    } catch {
+      // Ignore
+    }
+    planeDownSource = null;
+    cancelPointSources();
   };
 
   const cleanup = async () => {
     if (ended) return;
     ended = true;
 
-    cancelHitTestSources();
+    cancelAllHitTestSources();
 
     try {
       placedAnchor?.delete?.();
@@ -245,6 +290,11 @@ export async function startAnchoredTableAR(
 
     if (overlayHandle?.overlay.parentNode) {
       overlayHandle.overlay.parentNode.removeChild(overlayHandle.overlay);
+    }
+
+    if (envRenderTarget) {
+      envRenderTarget.dispose();
+      envRenderTarget = null;
     }
 
     if (renderer) {
@@ -298,9 +348,12 @@ export async function startAnchoredTableAR(
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.xr.enabled = true;
 
-    // Bind Three.js WebXRManager to 'local-floor' with safe fallback to 'local' so camera & poses match 100%
     try {
       renderer.xr.setReferenceSpaceType('local-floor');
       await renderer.xr.setSession(session);
@@ -317,20 +370,44 @@ export async function startAnchoredTableAR(
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
-    // Warm, balanced restaurant lighting for appetizing food colors
-    const hemiLight = new THREE.HemisphereLight(0xfff8ee, 0x3b3028, 1.4);
+    // Neutral studio IBL so ceramic plates & food glazes catch natural highlights
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      const roomEnv = new RoomEnvironment();
+      envRenderTarget = pmrem.fromScene(roomEnv, 0.04);
+      scene.environment = envRenderTarget.texture;
+      roomEnv.dispose();
+      pmrem.dispose();
+    } catch {
+      // Fallback to direct lights below
+    }
+
+    const hemiLight = new THREE.HemisphereLight(0xfff9f0, 0x3b3028, 1.15);
     scene.add(hemiLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff1de, 1.2);
-    dirLight.position.set(0.6, 1.8, 0.9);
+    const dirLight = new THREE.DirectionalLight(0xfff3e2, 1.35);
+    dirLight.position.set(0.55, 1.75, 0.85);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(1024, 1024);
+    dirLight.shadow.camera.near = 0.2;
+    dirLight.shadow.camera.far = 4.5;
+    dirLight.shadow.camera.left = -0.85;
+    dirLight.shadow.camera.right = 0.85;
+    dirLight.shadow.camera.top = 0.85;
+    dirLight.shadow.camera.bottom = -0.85;
+    dirLight.shadow.bias = -0.0004;
     scene.add(dirLight);
+    scene.add(dirLight.target);
 
-    const reticle = createReticleMesh();
+    const { group: reticle, pulseRing } = createReticleMesh();
     scene.add(reticle);
 
     const dishRoot = new THREE.Group();
     dishRoot.visible = false;
     scene.add(dishRoot);
+
+    // Keep shadow light aimed right at the anchored dish position
+    dirLight.target = dishRoot;
 
     const dishContent = new THREE.Group();
     dishRoot.add(dishContent);
@@ -348,23 +425,39 @@ export async function startAnchoredTableAR(
         loadedModel.position.x -= center.x;
         loadedModel.position.z -= center.z;
         loadedModel.position.y -= box.min.y;
+        loadedModel.traverse((obj) => {
+          if (obj instanceof THREE.Mesh) {
+            obj.castShadow = true;
+            obj.receiveShadow = true;
+          }
+        });
         dishContent.add(loadedModel);
 
-        // Grounded soft contact shadow directly under plate base (eliminates floating illusion)
-        const shadowSpan = Math.max(size.x, size.z, 0.24) * 1.25;
-        const shadowGeo = new THREE.PlaneGeometry(shadowSpan, shadowSpan);
-        shadowGeo.rotateX(-Math.PI / 2);
-        const shadowMat = new THREE.MeshBasicMaterial({
+        // Grounded real directional shadow catcher + soft ambient occlusion disc directly on surface
+        const shadowSpan = Math.max(size.x, size.z, 0.26) * 1.35;
+
+        const catcherGeo = new THREE.PlaneGeometry(shadowSpan * 1.4, shadowSpan * 1.4);
+        catcherGeo.rotateX(-Math.PI / 2);
+        const catcherMat = new THREE.ShadowMaterial({ opacity: 0.42 });
+        const catcherMesh = new THREE.Mesh(catcherGeo, catcherMat);
+        catcherMesh.position.y = 0;
+        catcherMesh.receiveShadow = true;
+        dishContent.add(catcherMesh);
+
+        const aoGeo = new THREE.PlaneGeometry(shadowSpan, shadowSpan);
+        aoGeo.rotateX(-Math.PI / 2);
+        const aoMat = new THREE.MeshBasicMaterial({
           map: createContactShadowTexture(),
           transparent: true,
           depthWrite: false,
           polygonOffset: true,
           polygonOffsetFactor: 1
         });
-        const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-        shadowMesh.position.y = -0.0005;
-        shadowMesh.renderOrder = -1;
-        dishContent.add(shadowMesh);
+        const aoMesh = new THREE.Mesh(aoGeo, aoMat);
+        aoMesh.position.y = -0.0005;
+        aoMesh.renderOrder = -1;
+        dishContent.add(aoMesh);
+
         modelReady = true;
       })
       .catch(() => {
@@ -375,107 +468,151 @@ export async function startAnchoredTableAR(
     const viewerSpace = await session.requestReferenceSpace('viewer');
 
     const requestHitSource = async (
+      entityType: 'plane' | 'point',
       ray?: XRRay
     ): Promise<XRHitTestSource | null> => {
       try {
-        const initWithEntities: Record<string, unknown> = {
+        const initWithEntity: Record<string, unknown> = {
           space: viewerSpace,
-          entityTypes: ['plane', 'point']
+          entityTypes: [entityType]
         };
-        if (ray) initWithEntities.offsetRay = ray;
+        if (ray) initWithEntity.offsetRay = ray;
         const src = await (
           session as XRSession & {
             requestHitTestSource?: (init: Record<string, unknown>) => Promise<XRHitTestSource>;
           }
-        ).requestHitTestSource?.(initWithEntities);
+        ).requestHitTestSource?.(initWithEntity);
         if (src) return src;
       } catch {
-        // Fallback when entityTypes isn't accepted
+        if (entityType === 'point') return null;
       }
 
-      try {
-        const basicInit: Record<string, unknown> = { space: viewerSpace };
-        if (ray) basicInit.offsetRay = ray;
-        return (
-          (await (
-            session as XRSession & {
-              requestHitTestSource?: (init: Record<string, unknown>) => Promise<XRHitTestSource>;
-            }
-          ).requestHitTestSource?.(basicInit)) ?? null
-        );
-      } catch {
-        return null;
+      if (entityType === 'plane') {
+        try {
+          const basicInit: Record<string, unknown> = { space: viewerSpace };
+          if (ray) basicInit.offsetRay = ray;
+          return (
+            (await (
+              session as XRSession & {
+                requestHitTestSource?: (init: Record<string, unknown>) => Promise<XRHitTestSource>;
+              }
+            ).requestHitTestSource?.(basicInit)) ?? null
+          );
+        } catch {
+          return null;
+        }
       }
+      return null;
     };
 
-    centerHitTestSource = await requestHitSource();
+    const downwardRay =
+      typeof XRRay === 'function' && typeof DOMPoint === 'function'
+        ? new XRRay(new DOMPoint(0, 0, 0), { x: 0, y: -0.37, z: -0.929 })
+        : undefined;
 
-    if (typeof XRRay === 'function' && typeof DOMPoint === 'function') {
-      const downwardRay = new XRRay(new DOMPoint(0, 0, 0), {
-        x: 0,
-        y: -0.35,
-        z: -0.936
-      });
-      angledHitTestSource = await requestHitSource(downwardRay);
+    planeCenterSource = await requestHitSource('plane');
+    if (downwardRay) {
+      planeDownSource = await requestHitSource('plane', downwardRay);
+    }
+    pointCenterSource = await requestHitSource('point');
+    if (downwardRay) {
+      pointDownSource = await requestHitSource('point', downwardRay);
     }
 
     const tempMatrix = new THREE.Matrix4();
     const camPos = new THREE.Vector3();
-    const camDir = new THREE.Vector3();
     const anchorPos = new THREE.Vector3();
     const anchorQuat = new THREE.Quaternion();
     const anchorScale = new THREE.Vector3();
 
-    let creatingAnchor = false;
     let firstFrameTime: number | null = null;
     let yawInitialized = false;
+    let placedAtTime = 0;
+    let needsAnchorRetry = false;
 
-    const pickFlatSurfaceHit = (
-      results: readonly XRHitTestResult[],
-      cameraPosition: THREE.Vector3
+    const planeCandidateWindow: THREE.Vector3[] = [];
+    const pointCandidateWindow: THREE.Vector3[] = [];
+    const lastReticlePos = new THREE.Vector3();
+    let hasReticlePos = false;
+
+    const pickHit = (
+      source: XRHitTestSource | null,
+      frame: XRFrame,
+      requireUpwardNormal: boolean
     ): { hit: XRHitTestResult; pos: THREE.Vector3 } | null => {
-      let fallbackPoint: { hit: XRHitTestResult; pos: THREE.Vector3 } | null = null;
-
+      if (!source) return null;
+      const results = frame.getHitTestResults(source);
       for (const res of results) {
         const pose = res.getPose(referenceSpace);
         if (!pose) continue;
 
         tempMatrix.fromArray(pose.transform.matrix);
         const pos = new THREE.Vector3().setFromMatrixPosition(tempMatrix);
-        const dist = pos.distanceTo(cameraPosition);
+        const dist = pos.distanceTo(camPos);
         if (dist < 0.18 || dist > 3.2) continue;
 
-        if (pose.transform.matrix[5] > 0.55) {
+        if (requireUpwardNormal) {
+          // Strict upward-facing flat plane (normal dot +Y > 0.72)
+          if (pose.transform.matrix[5] > 0.72) {
+            return { hit: res, pos };
+          }
+        } else if (pose.transform.matrix[5] > 0.6 || pos.y < camPos.y - 0.06) {
           return { hit: res, pos };
         }
-
-        if (!fallbackPoint && pos.y < cameraPosition.y - 0.04) {
-          fallbackPoint = { hit: res, pos };
-        }
-      }
-
-      return fallbackPoint;
-    };
-
-    const queryBestSurfaceHit = (frame: XRFrame) => {
-      if (centerHitTestSource) {
-        const centerHit = pickFlatSurfaceHit(frame.getHitTestResults(centerHitTestSource), camPos);
-        if (centerHit) return centerHit;
-      }
-      if (angledHitTestSource) {
-        return pickFlatSurfaceHit(frame.getHitTestResults(angledHitTestSource), camPos);
       }
       return null;
     };
 
-    const attachAnchorFromHit = (hitToAnchor: XRHitTestResult) => {
-      if (typeof hitToAnchor.createAnchor !== 'function' || creatingAnchor) {
-        cancelHitTestSources();
+    const queryPlaneHit = (frame: XRFrame) =>
+      pickHit(planeCenterSource, frame, true) ?? pickHit(planeDownSource, frame, true);
+
+    const queryPointHit = (frame: XRFrame) =>
+      pickHit(pointCenterSource, frame, false) ?? pickHit(pointDownSource, frame, false);
+
+    // Must be called synchronously inside XRFrame callback!
+    const createAnchorInFrame = (
+      frame: XRFrame,
+      targetPos: THREE.Vector3,
+      hitResult: XRHitTestResult | null,
+      cancelOnSuccess: boolean
+    ) => {
+      if (creatingAnchor) return;
+      const frameWithAnchor = frame as XRFrameWithAnchor;
+
+      let anchorPromise: Promise<XRAnchor> | undefined;
+      if (hitResult && typeof hitResult.createAnchor === 'function') {
+        try {
+          anchorPromise = hitResult.createAnchor();
+        } catch {
+          anchorPromise = undefined;
+        }
+      }
+      if (
+        !anchorPromise &&
+        typeof frameWithAnchor.createAnchor === 'function' &&
+        typeof XRRigidTransform === 'function'
+      ) {
+        try {
+          const transform = new XRRigidTransform({
+            x: targetPos.x,
+            y: targetPos.y,
+            z: targetPos.z,
+            w: 1
+          });
+          anchorPromise = frameWithAnchor.createAnchor(transform, referenceSpace);
+        } catch {
+          anchorPromise = undefined;
+        }
+      }
+
+      if (!anchorPromise) {
+        needsAnchorRetry = typeof frameWithAnchor.createAnchor === 'function';
         return;
       }
+
       creatingAnchor = true;
-      hitToAnchor
-        .createAnchor()
+      needsAnchorRetry = false;
+      anchorPromise
         .then((anchor) => {
           if (ended || !isPlaced) {
             anchor.delete?.();
@@ -483,11 +620,15 @@ export async function startAnchoredTableAR(
             placedAnchor?.delete?.();
             placedAnchor = anchor;
             anchorStabilized = false;
+            if (cancelOnSuccess) {
+              cancelAllHitTestSources();
+            }
           }
-          cancelHitTestSources();
         })
         .catch(() => {
-          cancelHitTestSources();
+          // If hitResult.createAnchor() rejected (common on raw 'point' hits), schedule synchronous
+          // frame.createAnchor() retry on the next XRFrame.
+          needsAnchorRetry = true;
         })
         .finally(() => {
           creatingAnchor = false;
@@ -495,8 +636,10 @@ export async function startAnchoredTableAR(
     };
 
     const lockAtPosition = (
+      frame: XRFrame,
       targetPos: THREE.Vector3,
-      hitToAnchor: XRHitTestResult | null,
+      hitResult: XRHitTestResult | null,
+      isRealPlane: boolean,
       nowMs: number
     ) => {
       if (!yawInitialized) {
@@ -508,20 +651,56 @@ export async function startAnchoredTableAR(
       dishRoot.position.copy(targetPos);
       dishRoot.quaternion.set(0, 0, 0, 1);
       dishRoot.visible = true;
+      dirLight.position.set(targetPos.x + 0.55, targetPos.y + 1.75, targetPos.z + 0.85);
+
       reticle.visible = false;
       isPlaced = true;
+      lockedByPlane = isRealPlane;
+      placedAtTime = nowMs;
+      upgradeWindowStart = nowMs;
       anchorStabilized = false;
+
+      // Subtle Google-Animals-style landing drop-settle
+      dishContent.scale.setScalar(0.84);
+      dishContent.position.y = 0.022;
 
       overlayHandle?.setUIState('placed');
       onStatusChange?.('placed');
 
-      if (hitToAnchor) {
-        needsSurfaceAnchorUpgrade = false;
-        attachAnchorFromHit(hitToAnchor);
+      if (isRealPlane) {
+        cancelPointSources();
+        createAnchorInFrame(frame, targetPos, hitResult, true);
       } else {
-        needsSurfaceAnchorUpgrade = true;
-        fallbackPlacedAt = nowMs;
+        cancelPointSources();
+        createAnchorInFrame(frame, targetPos, null, false);
       }
+    };
+
+    const averagePoints = (pts: THREE.Vector3[]): THREE.Vector3 => {
+      const sum = new THREE.Vector3();
+      for (const p of pts) sum.add(p);
+      return sum.divideScalar(pts.length);
+    };
+
+    const isClusterStable = (pts: THREE.Vector3[], maxVerticalSpread: number, maxLateralSpread: number) => {
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
+      }
+      return (
+        maxY - minY <= maxVerticalSpread &&
+        Math.hypot(maxX - minX, maxZ - minZ) <= maxLateralSpread
+      );
     };
 
     renderer.setAnimationLoop((time, frame: XRFrame | undefined) => {
@@ -532,28 +711,50 @@ export async function startAnchoredTableAR(
       if (viewerPose) {
         const m = viewerPose.transform.matrix;
         camPos.set(m[12], m[13], m[14]);
-        camDir.set(-m[8], -m[9], -m[10]).normalize();
       } else {
         const xrCam = renderer.xr.getCamera();
         camPos.setFromMatrixPosition(xrCam.matrixWorld);
-        xrCam.getWorldDirection(camDir);
       }
 
-      // 1. LOCKED MODE: Dish is automatically locked; track XRAnchor with zero micro-jitter
+      // 1. LOCKED MODE: Update hardware XRAnchor with 4 mm anti-jitter deadband & strict gravity lock
       if (isPlaced) {
-        // If placed via initial 650ms fallback, silently upgrade height & XRAnchor once on first real hit
-        if (needsSurfaceAnchorUpgrade && !placedAnchor && !creatingAnchor) {
-          if (time - fallbackPlacedAt > 2500) {
-            needsSurfaceAnchorUpgrade = false;
-            cancelHitTestSources();
+        // Silky 220ms landing settle ease-out
+        const sincePlaced = time - placedAtTime;
+        if (sincePlaced < 240) {
+          const t = Math.min(1, sincePlaced / 240);
+          const eased = 1 - Math.pow(1 - t, 3);
+          dishContent.scale.setScalar(0.84 + 0.16 * eased);
+          dishContent.position.y = 0.022 * (1 - eased);
+        } else {
+          dishContent.scale.setScalar(1);
+          dishContent.position.y = 0;
+        }
+
+        // If placed via point-consensus, silently upgrade Y + anchor once if real ARCore plane locks near it
+        if (!lockedByPlane && planeCenterSource && !creatingAnchor) {
+          if (time - upgradeWindowStart > 3000) {
+            lockedByPlane = true;
+            cancelAllHitTestSources();
           } else {
-            const upgradeHit = queryBestSurfaceHit(frame);
-            if (upgradeHit) {
-              needsSurfaceAnchorUpgrade = false;
-              dishRoot.position.y = upgradeHit.pos.y;
-              attachAnchorFromHit(upgradeHit.hit);
+            const planeHit = queryPlaneHit(frame);
+            if (planeHit) {
+              const lateral = Math.hypot(
+                planeHit.pos.x - dishRoot.position.x,
+                planeHit.pos.z - dishRoot.position.z
+              );
+              const vertDiff = Math.abs(planeHit.pos.y - dishRoot.position.y);
+              if (lateral < 0.35 && vertDiff < 0.14) {
+                lockedByPlane = true;
+                dishRoot.position.y = planeHit.pos.y;
+                const refinedPos = dishRoot.position.clone();
+                createAnchorInFrame(frame, refinedPos, null, true);
+              }
             }
           }
+        }
+
+        if (needsAnchorRetry && !placedAnchor && !creatingAnchor) {
+          createAnchorInFrame(frame, dishRoot.position.clone(), null, lockedByPlane);
         }
 
         if (placedAnchor) {
@@ -568,15 +769,20 @@ export async function startAnchoredTableAR(
             } else {
               const drift = dishRoot.position.distanceTo(anchorPos);
               if (drift >= 0.06) {
-                dishRoot.position.lerp(anchorPos, 0.45);
-              } else if (drift >= 0.003) {
-                dishRoot.position.lerp(anchorPos, 0.2);
+                dishRoot.position.lerp(anchorPos, 0.38);
+              } else if (drift >= 0.004) {
+                dishRoot.position.lerp(anchorPos, 0.16);
               }
+              // < 4 mm sub-millimeter tracking micro-jitter ignored completely
             }
           }
         }
 
-        // Strictly gravity-leveled plates at all times (zero tilt jitter)
+        dirLight.position.set(
+          dishRoot.position.x + 0.55,
+          dishRoot.position.y + 1.75,
+          dishRoot.position.z + 0.85
+        );
         dishRoot.quaternion.set(0, 0, 0, 1);
         dishRoot.visible = modelReady;
         reticle.visible = false;
@@ -585,32 +791,77 @@ export async function startAnchoredTableAR(
         return;
       }
 
-      // 2. INITIAL AUTO-LOCK: Query flat surface hits and lock automatically once ready
-      const bestHit = queryBestSurfaceHit(frame);
+      // 2. SCANNING MODE: Wait for genuine flat plane or stable surface consensus (never float mid-air!)
+      const planeHit = queryPlaneHit(frame);
+      const pointHit = planeHit ? null : queryPointHit(frame);
 
-      if (bestHit) {
-        reticle.position.copy(bestHit.pos);
-        reticle.visible = !modelReady;
-
-        if (modelReady) {
-          lockAtPosition(bestHit.pos, bestHit.hit, time);
+      const activeHit = planeHit ?? pointHit;
+      if (activeHit) {
+        if (!hasReticlePos) {
+          lastReticlePos.copy(activeHit.pos);
+          hasReticlePos = true;
         } else {
-          overlayHandle?.setUIState('scanning', 'Surface found — locking 1:1 dish…');
+          lastReticlePos.lerp(activeHit.pos, 0.35);
+        }
+
+        reticle.position.copy(lastReticlePos);
+        const pulse = 1 + 0.06 * Math.sin(time * 0.006);
+        pulseRing.scale.set(pulse, 1, pulse);
+        reticle.visible = true;
+
+        if (!modelReady) {
+          overlayHandle?.setUIState('scanning', 'Flat surface detected — preparing 1:1 dish…');
         }
       } else {
-        const elapsedMs = time - (firstFrameTime ?? time);
-        if (modelReady && elapsedMs >= 650) {
-          // Automatic placement fallback so AR always displays & locks immediately
-          const horizLen = Math.hypot(camDir.x, camDir.z) || 1;
-          const fallbackPos = new THREE.Vector3(
-            camPos.x + (camDir.x / horizLen) * 0.65,
-            camPos.y - 0.4,
-            camPos.z + (camDir.z / horizLen) * 0.65
-          );
-          lockAtPosition(fallbackPos, null, time);
-        } else {
-          reticle.visible = false;
+        reticle.visible = false;
+      }
+
+      if (!modelReady) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      const elapsedMs = time - (firstFrameTime ?? time);
+
+      // Path A: Verified ARCore horizontal plane (2 stable consecutive frames)
+      if (planeHit) {
+        planeCandidateWindow.push(planeHit.pos);
+        if (planeCandidateWindow.length > 3) planeCandidateWindow.shift();
+
+        if (
+          planeCandidateWindow.length >= 2 &&
+          isClusterStable(planeCandidateWindow, 0.02, 0.08)
+        ) {
+          const avgPlanePos = averagePoints(planeCandidateWindow);
+          lockAtPosition(frame, avgPlanePos, planeHit.hit, true, time);
+          renderer.render(scene, camera);
+          return;
         }
+      } else {
+        planeCandidateWindow.length = 0;
+      }
+
+      // Path B: Stable textured-surface point consensus (6 consistent frames after >= 450ms SLAM warmup)
+      if (pointHit && elapsedMs >= 450) {
+        pointCandidateWindow.push(pointHit.pos);
+        if (pointCandidateWindow.length > 6) pointCandidateWindow.shift();
+
+        if (
+          pointCandidateWindow.length >= 6 &&
+          isClusterStable(pointCandidateWindow, 0.018, 0.09)
+        ) {
+          const avgPointPos = averagePoints(pointCandidateWindow);
+          lockAtPosition(frame, avgPointPos, pointHit.hit, false, time);
+          renderer.render(scene, camera);
+          return;
+        }
+      }
+
+      if (elapsedMs > 4000 && !hasReticlePos) {
+        overlayHandle?.setUIState(
+          'scanning',
+          'Aim at a well-lit flat table or floor and move phone slowly side-to-side'
+        );
       }
 
       renderer.render(scene, camera);

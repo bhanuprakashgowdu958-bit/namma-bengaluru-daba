@@ -254,7 +254,8 @@ export function TableSpreadModal({
       return;
     }
 
-    if (isAndroid && canUseWebXR && spread?.arGlbUrl) {
+    const webxrAvailable = canUseWebXR || (await checkWebXRSupported());
+    if (isAndroid && webxrAvailable && spread?.arGlbUrl) {
       try {
         await startAnchoredTableAR({
           glbUrl: spread.arGlbUrl,

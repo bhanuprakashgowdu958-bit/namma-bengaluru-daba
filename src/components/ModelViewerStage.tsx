@@ -190,7 +190,8 @@ export const ModelViewerStage = forwardRef<ModelViewerStageHandle, ModelViewerSt
 
         // Prefer hardware-anchored Three.js WebXR on Android Chrome when supported, else Scene Viewer
         if (isAndroidDevice()) {
-          if (isWebXRSupported) {
+          const webxrAvailable = isWebXRSupported || (await checkWebXRSupported());
+          if (webxrAvailable) {
             try {
               await startAnchoredTableAR({
                 glbUrl: modelGlbSrc,
